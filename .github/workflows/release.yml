@@ -103,7 +103,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ github.ref_name }}" \
-            "nbtca-app-${{ github.ref_name }}.apk" \
-            --title "NBTCA 拔电关机 ${{ github.ref_name }}" \
-            --generate-notes
+          TAG="${{ github.ref_name }}"
+          ASSET="nbtca-app-${TAG}.apk"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --clobber
+          else
+            gh release create "$TAG" "$ASSET" \
+              --title "NBTCA 拔电关机 $TAG" \
+              --generate-notes
+          fi
