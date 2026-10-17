@@ -1,0 +1,32 @@
+services:
+  bff:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ghcr.io/nbtca/nbtca-app-bff:${IMAGE_TAG:-latest}
+    container_name: nbtca-app-bff
+    restart: unless-stopped
+    ports:
+      # 只绑定本机，由 Caddy 对外提供 HTTPS。
+      - "127.0.0.1:18080:8080"
+    environment:
+      PORT: "8080"
+      TZ: "Asia/Shanghai"
+      HTTP_TIMEOUT_SECONDS: "10"
+      CORS_ALLOWED_ORIGINS: "*"
+      SATURDAY_API_ENDPOINT: "https://api.nbtca.space"
+      SPACE_SITE_ENDPOINT: "https://nbtca.space"
+      CALENDAR_ENDPOINT: "https://ical.nbtca.space"
+      STATUS_API_ENDPOINT: "https://status.nbtca.space/api/status"
+      LOGTO_ENDPOINT: "https://auth.app.nbtca.space"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
