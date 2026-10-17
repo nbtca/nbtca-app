@@ -1,5 +1,8 @@
 # NBTCA Mobile Application (拔电关机 Android 客户端)
 
+[![CI](https://github.com/nbtca/nbtca-app/actions/workflows/ci.yml/badge.svg)](https://github.com/nbtca/nbtca-app/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/nbtca/nbtca-app)](https://github.com/nbtca/nbtca-app/releases)
+
 浙大宁波理工学院 计算机协会（NBTCA）官方移动端与聚合服务项目。
 
 ## 目录结构
