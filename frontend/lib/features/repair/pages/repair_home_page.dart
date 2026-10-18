@@ -89,6 +89,18 @@ class _RepairHomePageState extends State<RepairHomePage>
     _loadTickets();
   }
 
+  List<RepairTicket> _mergeTickets(
+    List<RepairTicket> primary,
+    List<RepairTicket> secondary,
+  ) {
+    final merged = <RepairTicket>[...primary];
+    final ids = primary.map((ticket) => ticket.id).toSet();
+    for (final ticket in secondary) {
+      if (ids.add(ticket.id)) merged.add(ticket);
+    }
+    return merged;
+  }
+
   Future<void> _loadTickets() async {
     setState(() => _isLoading = true);
     try {
@@ -97,8 +109,14 @@ class _RepairHomePageState extends State<RepairHomePage>
       if (!_authService.isLoggedIn) {
         // 未登录不展示任何人的公开工单，避免泄露其他同学的问题描述。
       } else if (_authService.isRepairAdmin) {
+        // 管理员需要完整联系方式；member 接口拿完整工单，公开队列补齐未接单工单。
         queue = await _apiClient.getPublicTickets(limit: 100);
-        tickets = queue;
+        try {
+          final memberTickets = await _apiClient.getMemberTickets(limit: 100);
+          tickets = _mergeTickets(memberTickets, queue);
+        } catch (_) {
+          tickets = queue;
+        }
       } else if (_authService.isRepairStaff) {
         final results = await Future.wait([
           _apiClient.getMemberTickets(limit: 100),

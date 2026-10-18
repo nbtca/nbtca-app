@@ -262,8 +262,9 @@ class ApiClient {
       paths.add('/events/$eid');
       requiresAuth.add(false);
     } else if (auth.isRepairAdmin) {
-      paths.add('/events/$eid');
-      requiresAuth.add(true);
+      // /events 是公开视图，不返回 phone/qq；管理员也先走 member 详情。
+      paths.addAll(['/member/events/$eid', '/events/$eid']);
+      requiresAuth.addAll([true, false]);
     } else if (auth.isRepairStaff) {
       paths.addAll(['/member/events/$eid', '/events/$eid']);
       requiresAuth.addAll([true, false]);
