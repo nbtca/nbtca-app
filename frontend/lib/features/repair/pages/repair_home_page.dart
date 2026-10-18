@@ -98,6 +98,13 @@ class _RepairHomePageState extends State<RepairHomePage>
     for (final ticket in secondary) {
       if (ids.add(ticket.id)) merged.add(ticket);
     }
+    merged.sort((a, b) {
+      final byTime = b.createdAt.compareTo(a.createdAt);
+      if (byTime != 0) return byTime;
+      final aId = int.tryParse(a.id) ?? 0;
+      final bId = int.tryParse(b.id) ?? 0;
+      return bId.compareTo(aId);
+    });
     return merged;
   }
 
