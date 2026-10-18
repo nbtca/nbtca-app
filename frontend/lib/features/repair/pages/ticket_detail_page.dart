@@ -35,6 +35,21 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
     _loadDetail();
   }
 
+  bool get _canViewContact {
+    if (!_authService.isLoggedIn) return false;
+    if (_authService.isRepairAdmin) return true;
+    if (_authService.isRepairStaff) {
+      final memberId = _authService.currentUser?.memberId;
+      return _ticket.isAccepted ||
+          _ticket.isCommitted ||
+          _ticket.isClosed ||
+          (memberId != null &&
+              memberId.isNotEmpty &&
+              _ticket.memberId == memberId);
+    }
+    return true;
+  }
+
   Future<void> _loadDetail() async {
     setState(() {
       _isLoading = true;
@@ -295,9 +310,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                                     (log) => Padding(
                                       padding: const EdgeInsets.only(bottom: 4),
                                       child: Text(
-                                        '${log.title} · ${formatChinaDateTime(log.timestamp)}${log.operator.isEmpty
-                                                ? ''
-                                                : ' · ${log.operator}'}',
+                                        '${log.title} · ${formatChinaDateTime(log.timestamp)}${log.operator.isEmpty ? '' : ' · ${log.operator}'}',
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                     ),
@@ -656,10 +669,13 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                   ),
                 ],
                 const Divider(height: 24),
-                _buildInfoRow('联系电话', _ticket.phone),
-                _buildInfoRow('QQ', _ticket.qq),
-                if (_ticket.phone.isEmpty && _ticket.qq.isEmpty)
-                  _buildInfoRow('联系方式', '未提供（公开工单）'),
+                if (_canViewContact) ...[
+                  _buildInfoRow('联系电话', _ticket.phone),
+                  _buildInfoRow('QQ', _ticket.qq),
+                  if (_ticket.phone.isEmpty && _ticket.qq.isEmpty)
+                    _buildInfoRow('联系方式', '未提供'),
+                ] else
+                  _buildInfoRow('联系方式', '接单后可见'),
                 _buildInfoRow('设备型号', _ticket.deviceType),
                 if (_ticket.size.isNotEmpty)
                   _buildInfoRow('工单大小', _ticket.size),
