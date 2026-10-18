@@ -82,7 +82,7 @@ class _LogtoWebViewPageState extends State<LogtoWebViewPage> {
   }
 
   Future<void> _handleRedirect(Uri uri) async {
-    if (_isCompleting) return;
+    if (!mounted || _isCompleting) return;
     setState(() {
       _isCompleting = true;
       _isLoading = true;
