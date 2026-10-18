@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../features/newsroom/models/news_article.dart';
 import '../../features/repair/models/repair_ticket.dart';
@@ -381,17 +382,53 @@ class ApiClient {
     }
   }
 
-  Future<RepairTicket> commitEvent(String eventId, String content) async {
+  Future<RepairTicket> commitEvent(
+    String eventId,
+    String content, {
+    String? size,
+  }) async {
     final eid = Uri.encodeComponent(eventId);
     try {
       final res = await _saturdayDio.post<dynamic>(
         '/member/events/$eid/commit',
-        data: {"content": content},
+        data: {
+          "content": content,
+          if (size != null && size.isNotEmpty) "size": size,
+        },
         options: await _authOptions(required: true),
       );
       return _parseTicket(res.data);
     } on DioException catch (e) {
       _throwDio(e, '提交维修报告');
+    }
+  }
+
+  Future<RepairTicket> uploadEventPhotos(
+    String eventId,
+    List<XFile> photos,
+  ) async {
+    final eid = Uri.encodeComponent(eventId);
+    try {
+      final formData = FormData();
+      for (final photo in photos) {
+        formData.files.add(
+          MapEntry(
+            'photos',
+            MultipartFile.fromBytes(
+              await photo.readAsBytes(),
+              filename: photo.name,
+            ),
+          ),
+        );
+      }
+      final res = await _saturdayDio.post<dynamic>(
+        '/member/events/$eid/photos',
+        data: formData,
+        options: await _authOptions(required: true),
+      );
+      return _parseTicket(res.data);
+    } on DioException catch (e) {
+      _throwDio(e, '上传现场照片');
     }
   }
 

@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/auth/auth_service.dart';
@@ -103,49 +106,348 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
       );
 
   Future<void> _showCommitDialog() async {
-    final controller = TextEditingController();
-    final content = await showDialog<String>(
+    final descriptionController = TextEditingController();
+    final modelController = TextEditingController(text: _ticket.deviceType);
+    final phoneController = TextEditingController(text: _ticket.phone);
+    final qqController = TextEditingController(text: _ticket.qq);
+    final selectedPhotos = <XFile>[];
+    const sizes = <String, String>{
+      'xs': 'XS · 极小',
+      's': 'S · 小',
+      'm': 'M · 中',
+      'l': 'L · 大',
+      'xl': 'XL · 极大',
+    };
+    String? selectedSize =
+        sizes.containsKey(_ticket.size) ? _ticket.size : null;
+    String? errorText;
+
+    final result = await showModalBottomSheet<_CommitReportData>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('提交维修结果报告'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '请填写详细维修处理方案与测试结果，提交后等待管理员审核结单：',
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: '如：已拆机清灰并重涂信越7921硅脂，烤机测试温度正常',
-                border: OutlineInputBorder(),
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            Future<void> pickPhotos() async {
+              final picked = await ImagePicker().pickMultiImage(
+                imageQuality: 85,
+                maxWidth: 2000,
+              );
+              if (picked.isEmpty) return;
+              if (selectedPhotos.length + picked.length > 6) {
+                setModalState(() => errorText = '最多上传 6 张现场照片');
+                return;
+              }
+              setModalState(() {
+                selectedPhotos.addAll(picked);
+                errorText = null;
+              });
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              ),
+              child: SizedBox(
+                height: MediaQuery.of(ctx).size.height * 0.86,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            '提交维修报告',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildReportLabel(ctx, '型号'),
+                            TextField(
+                              controller: modelController,
+                              readOnly: true,
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _buildReportLabel(ctx, '联系电话'),
+                                      TextField(
+                                        controller: phoneController,
+                                        readOnly: true,
+                                        decoration: const InputDecoration(
+                                          border: OutlineInputBorder(),
+                                          isDense: true,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _buildReportLabel(ctx, 'QQ'),
+                                      TextField(
+                                        controller: qqController,
+                                        readOnly: true,
+                                        decoration: const InputDecoration(
+                                          border: OutlineInputBorder(),
+                                          isDense: true,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                _buildReportLabel(ctx, '现场照片'),
+                                const Spacer(),
+                                TextButton.icon(
+                                  onPressed: pickPhotos,
+                                  icon: const Icon(Icons.add_a_photo_outlined,
+                                      size: 18),
+                                  label: const Text('添加照片'),
+                                ),
+                              ],
+                            ),
+                            if (_ticket.photos.isNotEmpty ||
+                                selectedPhotos.isNotEmpty)
+                              SizedBox(
+                                height: 84,
+                                child: ListView(
+                                  scrollDirection: Axis.horizontal,
+                                  children: [
+                                    for (final url in _ticket.photos)
+                                      _buildReportPhoto(
+                                        image: CachedNetworkImage(
+                                          imageUrl: url,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    for (var i = 0;
+                                        i < selectedPhotos.length;
+                                        i++)
+                                      _buildReportPhoto(
+                                        image: Image.file(
+                                          File(selectedPhotos[i].path),
+                                          fit: BoxFit.cover,
+                                        ),
+                                        onRemove: () => setModalState(
+                                          () => selectedPhotos.removeAt(i),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              )
+                            else
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(ctx)
+                                      .colorScheme
+                                      .surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Text(
+                                  '还没有照片，可添加维修后的现场照片',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            const SizedBox(height: 12),
+                            _buildReportLabel(ctx, '维修记录'),
+                            if (_ticket.timeline.isEmpty)
+                              const Text('暂无维修记录',
+                                  style: TextStyle(fontSize: 12))
+                            else
+                              ..._ticket.timeline.reversed.take(3).map(
+                                    (log) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 4),
+                                      child: Text(
+                                        '${log.title} · ${formatChinaDateTime(log.timestamp)}${log.operator.isEmpty
+                                                ? ''
+                                                : ' · ${log.operator}'}',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                  ),
+                            const SizedBox(height: 12),
+                            _buildReportLabel(ctx, '维修难度'),
+                            DropdownButtonFormField<String>(
+                              initialValue: selectedSize,
+                              decoration: const InputDecoration(
+                                hintText: '请选择维修难度',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                              items: sizes.entries
+                                  .map(
+                                    (entry) => DropdownMenuItem(
+                                      value: entry.key,
+                                      child: Text(entry.value),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) => setModalState(
+                                () => selectedSize = value,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _buildReportLabel(ctx, '维修描述'),
+                            TextField(
+                              controller: descriptionController,
+                              maxLines: 5,
+                              decoration: const InputDecoration(
+                                hintText: '请填写维修处理方案、更换部件与测试结果',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            if (errorText != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                errorText!,
+                                style: const TextStyle(
+                                  color: Colors.redAccent,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () {
+                          final description = descriptionController.text.trim();
+                          if (description.isEmpty) {
+                            setModalState(() => errorText = '请填写维修描述');
+                            return;
+                          }
+                          if (selectedSize == null) {
+                            setModalState(() => errorText = '请选择维修难度');
+                            return;
+                          }
+                          Navigator.pop(
+                            ctx,
+                            _CommitReportData(
+                              description: description,
+                              size: selectedSize!,
+                              photos: List<XFile>.from(selectedPhotos),
+                            ),
+                          );
+                        },
+                        child: const Text('提交'),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('放弃'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (result == null) return;
+    await _runAction(
+      () async {
+        if (result.photos.isNotEmpty) {
+          await _apiClient.uploadEventPhotos(_ticket.id, result.photos);
+        }
+        return _apiClient.commitEvent(
+          _ticket.id,
+          result.description,
+          size: result.size,
+        );
+      },
+      '维修报告已提交，等待管理员审核',
+    );
+  }
+
+  Widget _buildReportLabel(BuildContext context, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportPhoto({required Widget image, VoidCallback? onRemove}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: SizedBox(width: 96, height: 84, child: image),
+          ),
+          if (onRemove != null)
+            Positioned(
+              top: 2,
+              right: 2,
+              child: GestureDetector(
+                onTap: onRemove,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+                ),
               ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('提交审核'),
-          ),
         ],
       ),
     );
-
-    if (content != null && content.isNotEmpty) {
-      await _runAction(
-        () => _apiClient.commitEvent(_ticket.id, content),
-        '维修报告已提交，等待管理员审核',
-      );
-    }
   }
 
   Future<void> _showEditDialog() async {
@@ -762,4 +1064,16 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
       ),
     );
   }
+}
+
+class _CommitReportData {
+  final String description;
+  final String size;
+  final List<XFile> photos;
+
+  const _CommitReportData({
+    required this.description,
+    required this.size,
+    required this.photos,
+  });
 }
