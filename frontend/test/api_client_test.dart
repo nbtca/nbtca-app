@@ -257,7 +257,7 @@ void main() {
       expect(tickets.single.statusName, '待审核');
     });
 
-    test('admin detail uses authenticated /events/{id}', () async {
+    test('admin detail uses member endpoint for full contacts', () async {
       final adapter = _FakeAdapter((options) async => _json({
             'eventId': 750,
             'clientId': 934,
@@ -279,7 +279,7 @@ void main() {
       );
 
       final ticket = await client.getTicketDetail('750');
-      expect(adapter.requests.single.path, '/events/750');
+      expect(adapter.requests.single.path, '/member/events/750');
       expect(ticket.phone, '13500135000');
     });
   });
