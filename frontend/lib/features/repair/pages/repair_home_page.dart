@@ -79,6 +79,9 @@ class _RepairHomePageState extends State<RepairHomePage>
       controllerChanged = true;
     }
     _isStaff = nextIsStaff;
+    if (nextIsStaff && _ticketStatusFilter == 'open') {
+      _ticketStatusFilter = 'all';
+    }
     setState(() {});
     if (controllerChanged) {
       // 等这一帧完成 TabBar/TabBarView 的切换后再释放旧 controller。
@@ -116,20 +119,42 @@ class _RepairHomePageState extends State<RepairHomePage>
       if (!_authService.isLoggedIn) {
         // 未登录不展示任何人的公开工单，避免泄露其他同学的问题描述。
       } else if (_authService.isRepairAdmin) {
-        // 管理员需要完整联系方式；member 接口拿完整工单，公开队列补齐未接单工单。
-        queue = await _apiClient.getPublicTickets(limit: 100);
+        // 管理员需要完整联系方式；member 工单合并进管理台队列，公开队列补齐其余工单。
+        final publicQueue = await _apiClient.getPublicTickets(limit: 100);
+        queue = publicQueue;
         try {
           final memberTickets = await _apiClient.getMemberTickets(limit: 100);
-          tickets = _mergeTickets(memberTickets, queue);
+          queue = _mergeTickets(memberTickets, publicQueue);
         } catch (_) {
-          tickets = queue;
+          queue = publicQueue;
         }
+        // member 列表不一定包含未接取工单；管理员按详情补齐待受理工单的联系方式。
+        final pendingForContact =
+            queue.where((ticket) => ticket.isOpen).take(20).toList();
+        if (pendingForContact.isNotEmpty) {
+          final enriched = await Future.wait(
+            pendingForContact.map((ticket) async {
+              try {
+                return await _apiClient.getTicketDetail(
+                  ticket.id,
+                  fallback: ticket,
+                );
+              } catch (_) {
+                return ticket;
+              }
+            }),
+          );
+          final byId = {for (final ticket in enriched) ticket.id: ticket};
+          queue = queue.map((ticket) => byId[ticket.id] ?? ticket).toList();
+        }
+        tickets = queue.where((ticket) => !ticket.isOpen).toList();
       } else if (_authService.isRepairStaff) {
         final results = await Future.wait([
           _apiClient.getMemberTickets(limit: 100),
           _apiClient.getPublicTickets(limit: 100),
         ]);
-        tickets = results[0];
+        // 待受理工单在“待处理”页单独展示，工单总览只保留已接取后的记录。
+        tickets = results[0].where((ticket) => !ticket.isOpen).toList();
         queue = results[1];
       } else {
         tickets = await _apiClient.getClientTickets(limit: 100);
@@ -740,11 +765,13 @@ class _RepairHomePageState extends State<RepairHomePage>
               child: Row(
                 children: [
                   _buildFilterChip('全部 (${_tickets.length})', 'all', isDark),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(
-                      '待受理 (${_tickets.where((t) => t.isOpen).length})',
-                      'open',
-                      isDark),
+                  if (!_isStaff) ...[
+                    const SizedBox(width: 8),
+                    _buildFilterChip(
+                        '待受理 (${_tickets.where((t) => t.isOpen).length})',
+                        'open',
+                        isDark),
+                  ],
                   const SizedBox(width: 8),
                   _buildFilterChip('维修中', 'ongoing', isDark),
                   const SizedBox(width: 8),
