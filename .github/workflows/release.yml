@@ -51,7 +51,12 @@ jobs:
           echo "signed=true" >> "$GITHUB_ENV"
 
       - name: Build Release APK
-        run: ./gradlew assembleRelease --stacktrace
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          echo "打包版本：$VERSION"
+          ./gradlew assembleRelease -PversionName="$VERSION" --stacktrace
 
       - name: Verify signing
         if: env.signed == 'true'
