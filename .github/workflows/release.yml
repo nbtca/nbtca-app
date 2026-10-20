@@ -27,41 +27,49 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      # 有签名 secrets 时才还原 keystore；没有则构建未签名包，不发布正式资产
-      - name: Prepare signing (optional)
+      # 从仓库 secrets 还原签名（与本地 .signing 同一套 keystore）
+      - name: Restore signing
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            mkdir -p .signing
-            echo "$KEYSTORE_BASE64" | base64 -d > .signing/nbtca-release.jks
-            {
-              echo "storeFile=.signing/nbtca-release.jks"
-              echo "storePassword=$KEYSTORE_PASSWORD"
-              echo "keyAlias=$KEY_ALIAS"
-              echo "keyPassword=$KEY_PASSWORD"
-            } > key.properties
-            echo "signed=true" >> "$GITHUB_ENV"
-          else
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "缺少签名 secrets，将产出未签名包且不发布 release"
             echo "signed=false" >> "$GITHUB_ENV"
+            exit 0
           fi
+          mkdir -p .signing
+          echo "$KEYSTORE_BASE64" | base64 -d > .signing/nbtca-release.jks
+          {
+            echo "storeFile=.signing/nbtca-release.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > key.properties
+          echo "signed=true" >> "$GITHUB_ENV"
 
       - name: Build Release APK
         run: ./gradlew assembleRelease --stacktrace
 
+      - name: Verify signing
+        if: env.signed == 'true'
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -r | head -1)
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: apk
-          path: app/build/outputs/apk/release/*.apk
+          name: nbtca-app-apk
+          path: app/build/outputs/apk/release/app-release.apk
 
-      - name: Create GitHub Release
+      - name: Publish GitHub Release with APK
         if: env.signed == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/app-release.apk
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
