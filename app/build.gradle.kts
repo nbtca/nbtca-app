@@ -42,9 +42,16 @@ android {
         }
     }
 
+    val releaseKeystore = keystoreProperties.getProperty("storeFile")
+        ?.let { rootProject.file(it) }
+        ?.takeIf { it.exists() }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.findByName("release")
+            // 只有本机存在 keystore 时才启用签名；CI 上没配置 secrets 也能出包（未签名）
+            if (releaseKeystore != null) {
+                signingConfig = signingConfigs.findByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
