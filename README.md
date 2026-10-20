@@ -1,89 +1,76 @@
-# NBTCA Mobile Application (拔电关机 Android 客户端)
+# NBTCA Android App (拔电关机)
 
-[![CI](https://github.com/nbtca/nbtca-app/actions/workflows/ci.yml/badge.svg)](https://github.com/nbtca/nbtca-app/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/nbtca/nbtca-app)](https://github.com/nbtca/nbtca-app/releases)
+宁波工程学院计算机协会（NBTCA）官方 Android 客户端，采用 **Kotlin + Jetpack Compose** 现代原生架构开发。
 
-浙大宁波理工学院 计算机协会（NBTCA）官方移动端与聚合服务项目。
+本仓库专用于 **Android 端** 客户端的开发、维护与持续交付。
 
-## 目录结构
+---
 
-```text
-nbtca-app/
-├── backend/                  # Go BFF 聚合层（RSS / 日历 / 服务状态 / AI 预检）
-│   ├── cmd/server/main.go
-│   ├── internal/config/      # 环境变量与端点配置
-│   ├── internal/handler/     # HTTP 路由与处理器
-│   ├── internal/service/     # RSS、ICS、status、Saturday 代理、诊断
-│   └── go.mod
-├── frontend/                 # Flutter Android 客户端
-│   ├── lib/core/auth/        # Logto PKCE、Token 安全存储
-│   ├── lib/core/network/     # BFF 与 Saturday API 客户端
-│   ├── lib/features/         # Newsroom / Repair / Tools / Profile
-│   └── pubspec.yaml
-├── docker-compose.yml        # BFF 容器部署
-├── DEPLOY.md                 # Docker 部署与 App 指向说明
-└── README.md
-```
+## 📱 核心功能特性
 
-## 架构与真实数据源
+1. **资讯广场 (Newsroom)**
+   - 协会官方新闻、大型活动发布与学术讲座通知
+   - 分类筛选（志愿维修、学术讲座、系统公告等）
+   - 精选置顶头条推荐与离线自适应支持
 
-- **Newsroom**：BFF 从 `https://nbtca.space/rss.xml` 拉取文章列表，按需抓取文章页并转 Markdown，带内存缓存。
-- **维修 (Saturday)**：客户端使用 Logto access token 直连 `https://api.nbtca.space/v2`，按角色使用 `/client/events`、`/member/events`、`/events`；BFF 不再保存假工单。
-- **校历**：BFF 解析 `https://ical.nbtca.space/school.ics`，以“秋季/春季学期开始上课”计算教学周；2026-10-17 对应 2026-2027 秋季学期第 5 周。
-- **协会活动日历**：BFF 单独解析 `https://ical.nbtca.space/events.ics`，展示近期协会活动、时间与描述；地点暂不展示。
-- **服务状态**：BFF 转发 `https://status.nbtca.space/api/status`，App 展示真实分组、故障组件与事件。
-- **AI 预检**：配置 Dify 时调用 workflow；未配置时使用本地关键词兜底，并标记来源。
+2. **电脑报修 (Repair)**
+   - 宁波工程学院“周末电脑义诊”线上化全流程报修支持
+   - 周六常规义诊时间、地点及值班状态实时监测
+   - 工单全生命周期追踪（待接单、处理中、已结单、已驳回）
+   - 支持报修同学、技术员及管理员多重身份与操作联动
 
-## 登录
+3. **教务系统 (Academic)**
+   - 网页登录一次后保存会话，课表 / 考试 / 成绩本地缓存
+   - 课表按校历周次翻页（本周优先），支持任意学年学期查询
+   - 数据全部存本机，离线可看；退出可清会话
 
-- Logto **Authorization Code + PKCE**，redirect URI 为 `https://nbtca.space/callback`。
-- Token 存在 Android Keystore / 平台安全存储，支持 refresh；正式包不再默认管理员。
-- 开发角色切换仅 Debug 构建可见。
+4. **在线更新 (Update)**
+   - 从 GitHub Releases 检查更新，支持「稳定版 / Beta」双通道
+   - 发现新版本可直接跳转 APK 下载
 
-## 快速开始
+5. **社团工具 (Tools)**
+   - **社团日历**：直接同步与解析协会官方活动日程（`events.ics`）
+   - **服务可用性监控**：实时探测 BFF 网关、Saturday 接口、Logto 认证中心等基础设施运行健康度
+   - **快捷入口**：关联官方主站、开源镜像源及交流群组
 
-### 后端
+4. **个人中心 (Profile)**
+   - 统一身份认证：基于 **Logto OAuth2 + PKCE** 安全授权登录与 Token 自动续期
+   - 角色与权限展现：关联用户协会职务、技术员认证与管理员权限
+   - 调试模式：支持快速切换报修同学/技术员/管理员视角，便于本地功能测试与审核演示
+   - 网络环境配置：自由切换本地调试模拟器（`10.0.2.2:8080`）或线上生产环境（`bff.nbtca.space`）
 
+---
+
+## 🛠️ 技术架构
+
+- **语言**：Kotlin 2.1+
+- **UI 框架**：Jetpack Compose (Material 3)
+- **网络与序列化**：OkHttp 4.12 + Kotlinx.Serialization JSON
+- **异步处理**：Kotlin Coroutines + Flow / StateFlow
+- **图片加载**：Coil Compose
+- **目标 SDK**：`minSdk: 26` / `targetSdk: 35` / `compileSdk: 35`
+- **构建工具**：Gradle 8.10+ (KTS)
+
+---
+
+## 🚀 编译与调试
+
+### 1. 环境准备
+- **JDK**：OpenJDK 17 或 21（推荐使用 LibericaJDK 17 或 Android Studio 自带 JBR）
+- **Android SDK**：API Level 35/36 Build-Tools
+
+### 2. 编译调试 APK
 ```bash
-cd backend
-go run ./cmd/server
-# 或
-go build -o nbtca-backend.exe ./cmd/server
-go test ./...
+# Windows PowerShell
+.\gradlew.bat assembleDebug
+
+# Linux / macOS
+./gradlew assembleDebug
 ```
+产物输出路径：`app/build/outputs/apk/debug/app-debug.apk`
 
-默认监听 `:8080`，健康检查 `GET /health`，API 前缀 `/api/v1`。
-Docker 部署见 [DEPLOY.md](DEPLOY.md)，服务器映射端口为 `18080`。
-
-### 客户端
-
+### 3. 安装至模拟器 / 真机
 ```bash
-cd frontend
-flutter pub get
-flutter analyze
-flutter test
-flutter run
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n space.nbtca.app/.MainActivity
 ```
-
-- Android 模拟器 BFF：`http://10.0.2.2:8080/api/v1`。
-- 真机在 `个人中心 -> 后端服务器配置` 填电脑局域网地址；会持久保存。
-- Release 默认禁止明文 HTTP，请为 BFF 配置 HTTPS。
-
-## 后端环境变量
-
-| 变量 | 默认值 | 说明 |
-| :--- | :--- | :--- |
-| `PORT` | `8080` | HTTP 监听端口 |
-| `SATURDAY_API_ENDPOINT` | `https://api.nbtca.space` | Saturday API 基地址 |
-| `SPACE_SITE_ENDPOINT` | `https://nbtca.space` | 官网 RSS/文章源 |
-| `CALENDAR_ENDPOINT` | `https://ical.nbtca.space` | 校历 ICS 源 |
-| `STATUS_API_ENDPOINT` | `https://status.nbtca.space/api/status` | 服务状态源 |
-| `LOGTO_ENDPOINT` | `https://auth.app.nbtca.space` | Logto OIDC |
-| `DIFY_API_ENDPOINT` / `DIFY_API_KEY` | 空 | 可选 Dify workflow |
-| `CORS_ALLOWED_ORIGINS` | `*` | 逗号分隔的允许来源 |
-
-## 相关开源工程
-
-- [nbtca/Home](https://github.com/nbtca/Home) · [nbtca.space](https://nbtca.space)
-- [nbtca/Saturday](https://github.com/nbtca/Saturday) · [nbtca/Sunday](https://github.com/nbtca/Sunday)
-- `nbtca/calendar`、`nbtca/heartbeat`

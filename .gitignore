@@ -1,39 +1,32 @@
-# OS / editor
+# Gradle / Android Studio
+.gradle/
+build/
+*/build/
+*.iml
+.idea/
+local.properties
+.signing/
+key.properties
+*.jks
+*.keystore
+
+# OS & Editor
 .DS_Store
 Thumbs.db
 .vscode/
 *.code-workspace
 
-# Go build artifacts
-backend/*.exe
-backend/*.exe~
-backend/*.test
-backend/nbtca-backend-linux-*
-backend/coverage.out
+# Test / Debug Artifacts
+screenshot_*.png
+*.apk
+*.aab
+*.png.bak
 
-# Flutter / Dart (nested frontend/.gitignore also covers these)
+# Legacy Flutter / Go leftovers
 frontend/build/
 frontend/.dart_tool/
 frontend/.pub-cache/
-frontend/.pub/
-frontend/.flutter-plugins
 frontend/.flutter-plugins-dependencies
-frontend/.packages
-frontend/.idea/
-frontend/*.iml
-frontend/android/.gradle/
-frontend/android/local.properties
-frontend/windows/flutter/ephemeral/
-
-# Local secrets / environment
-.env
-.env.*
-!.env.example
-
-# Android release signing
-frontend/android/key.properties
-frontend/android/release.jks
-frontend/android/app/release.jks
-frontend/android/**/*.jks
-frontend/android/**/*.keystore
-.signing/
+backend/*.exe
+backend/*.exe~
+backend/nbtca-backend-linux-amd64
