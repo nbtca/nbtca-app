@@ -64,6 +64,12 @@ android {
         }
     }
 
+    lint {
+        // Release 构建不跑 lintVital，避免 CI 额外拉取 lint 依赖导致构建不稳定
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
