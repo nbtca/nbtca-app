@@ -55,8 +55,20 @@ jobs:
           TAG_NAME: ${{ github.ref_name }}
         run: |
           VERSION="${TAG_NAME#v}"
-          echo "打包版本：$VERSION"
-          ./gradlew assembleRelease -PversionName="$VERSION" --stacktrace
+          CORE="${VERSION%%-*}"
+          MAJOR="$(echo "$CORE" | cut -d. -f1)"
+          MINOR="$(echo "$CORE" | cut -d. -f2)"
+          PATCH="$(echo "$CORE" | cut -d. -f3)"
+          # 预发布用 beta/rc 序号占低两位，正式版固定 90，保证 stable > 同版本 pre-release
+          PRE=90
+          if [[ "$VERSION" =~ -(beta|rc)\.([0-9]+)$ ]]; then
+            PRE="${BASH_REMATCH[2]}"
+          fi
+          VERSION_CODE=$(( MAJOR * 1000000 + MINOR * 10000 + PATCH * 100 + PRE ))
+          echo "打包版本：$VERSION（versionCode=$VERSION_CODE）"
+          ./gradlew assembleRelease -PversionName="$VERSION" -PversionCode="$VERSION_CODE" --stacktrace
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
 
       - name: Verify signing
         if: env.signed == 'true'
@@ -74,7 +86,12 @@ jobs:
         if: env.signed == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          name: NBTCA 拔电关机 v${{ env.VERSION_NAME }}
           files: app/build/outputs/apk/release/app-release.apk
           fail_on_unmatched_files: true
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
