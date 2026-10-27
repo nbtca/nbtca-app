@@ -1,0 +1,1 @@
+{"code":0,"message":"success","data":{"device_type":"desktop","possible_causes":["常规硬件接触松动或静电堆积","操作系统引导文件异常或系统组件损坏"],"self_help_steps":["释放静电：长按电源键 30 秒进行静电释放后重试","使用 PE 启动盘进入临时系统排查硬件识别情况"],"recommended_tools":["WePE 启动盘","图吧工具箱"],"suggest_repair":true,"summary":"故障原因较复杂，建议直接提交工单，由 NBTCA 技术骨干一对一在线诊断或线下当面检测。","source":"heuristic"}}

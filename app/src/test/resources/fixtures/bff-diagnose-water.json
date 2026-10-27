@@ -1,0 +1,1 @@
+{"code":0,"message":"success","data":{"device_type":"laptop","possible_causes":["主板供电短路损坏","键盘内部导电薄膜腐蚀","电池短路甚至鼓包危险"],"self_help_steps":["【紧急】切勿尝试开机！切勿插充电器！","立即拔掉所有外接电源与外设，若为可拆卸电池请立即断电","倒扣笔记本并放置在通风处，尽快送往维修点进行主板超声波洗板和烘干"],"recommended_tools":["无水乙醇洗板水","防静电手套","螺丝刀套装"],"suggest_repair":true,"summary":"设备进水风险极高，请立刻完全断电勿二次通电，建议立即送修让技术员拆机拔电池断电清洗！","source":"heuristic"}}
