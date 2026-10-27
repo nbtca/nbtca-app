@@ -23,8 +23,6 @@ Thumbs.db
 screenshot_*.png
 *.png.bak
 
-# Legacy Flutter leftovers
-frontend/build/
-frontend/.dart_tool/
-frontend/.pub-cache/
-frontend/.flutter-plugins-dependencies
+# 旧版 Flutter 客户端已从仓库移除，仅保留本地目录不再跟踪
+frontend/
+
