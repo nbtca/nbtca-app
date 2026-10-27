@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +42,39 @@ import space.nbtca.app.core.auth.LogtoAuth
 import space.nbtca.app.ui.theme.AppColors
 import space.nbtca.app.ui.theme.AppThemeColors
 import java.util.concurrent.TimeUnit
+
+/**
+ * 视口高度兜底脚本：仅当 100vh 解析为 0（WebView 缺陷）时才注入固定像素高度，
+ * 正常环境探测到 vh > 0 会直接返回，不做任何修改。
+ */
+private const val VIEWPORT_HEIGHT_FALLBACK = """
+(function () {
+  try {
+    var probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;visibility:hidden;height:100vh';
+    document.body.appendChild(probe);
+    var vh = probe.getBoundingClientRect().height;
+    probe.parentNode.removeChild(probe);
+    if (vh > 0) return 'ok';
+    var h = window.innerHeight || document.documentElement.clientHeight;
+    if (h <= 0) return 'skip';
+    var style = document.getElementById('nbtca-viewport-fallback');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'nbtca-viewport-fallback';
+      document.head.appendChild(style);
+    }
+    style.textContent =
+      'html,body{height:' + h + 'px !important;min-height:' + h + 'px !important}' +
+      'div[class*="viewBox"]{position:relative !important;height:' + h + 'px !important;min-height:' + h + 'px !important}' +
+      '.logto_page-container,.logto_main-content{min-height:' + h + 'px !important}';
+    return 'fixed';
+  } catch (e) {
+    return 'error';
+  }
+})()
+"""
+
 
 /**
  * Logto OAuth2 + PKCE 登录：WebView 拦截官网回调地址，取 code 本地换 token。
@@ -67,8 +101,20 @@ fun LoginScreen(
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var exchanging by remember { mutableStateOf(false) }
+    // 记录 WebView 实例，退出时显式销毁：否则每次打开登录都会留下一个存活的 WebView 渲染进程。
+    val webViewHolder = remember { arrayOfNulls<WebView>(1) }
 
     BackHandler { onClose() }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            webViewHolder[0]?.let { view ->
+                view.stopLoading()
+                view.destroy()
+            }
+            webViewHolder[0] = null
+        }
+    }
 
     fun handleCode(code: String) {
         if (exchanging) return
@@ -116,6 +162,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
                     WebView(context).apply {
+                        webViewHolder[0] = this
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
@@ -128,6 +175,10 @@ fun LoginScreen(
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
                                 isLoading = false
+                                // Logto 用 position:absolute;inset:0 撑满视口。个别 WebView
+                                // （Android 17 预览镜像的 WebView 155）把 100vh/100dvh 解析成 0，
+                                // 整页会塌成空白；探测到这种环境时用 innerHeight 兜底。
+                                view?.evaluateJavascript(VIEWPORT_HEIGHT_FALLBACK, null)
                             }
 
                             override fun shouldOverrideUrlLoading(
