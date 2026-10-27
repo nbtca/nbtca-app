@@ -2,6 +2,7 @@
 .gradle/
 build/
 */build/
+build-artifacts/
 *.iml
 .idea/
 local.properties
@@ -16,17 +17,14 @@ Thumbs.db
 .vscode/
 *.code-workspace
 
-# Test / Debug Artifacts
-screenshot_*.png
+# Build / test artifacts & captures
 *.apk
 *.aab
+screenshot_*.png
 *.png.bak
 
-# Legacy Flutter / Go leftovers
+# Legacy Flutter leftovers
 frontend/build/
 frontend/.dart_tool/
 frontend/.pub-cache/
 frontend/.flutter-plugins-dependencies
-backend/*.exe
-backend/*.exe~
-backend/nbtca-backend-linux-amd64
