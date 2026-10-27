@@ -58,9 +58,8 @@ object LogtoAuth {
     }
 
     fun buildAuthorizeUrl(codeChallenge: String, state: String): String {
-        return Uri.parse(ENDPOINT)
+        return Uri.parse("$ENDPOINT/oidc/auth")
             .buildUpon()
-            .appendEncodedPath("oidc/auth")
             .appendQueryParameter("client_id", APP_ID)
             .appendQueryParameter("redirect_uri", REDIRECT_URI)
             .appendQueryParameter("response_type", "code")

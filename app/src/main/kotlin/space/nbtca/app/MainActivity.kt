@@ -14,7 +14,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import space.nbtca.app.core.auth.AuthManager
 import space.nbtca.app.core.config.AppSettings
+import space.nbtca.app.core.data.CalendarRepository
+import space.nbtca.app.core.data.CoverStore
+import space.nbtca.app.core.data.DiskCache
+import space.nbtca.app.core.data.NewsRepository
+import space.nbtca.app.core.data.StatusRepository
 import space.nbtca.app.core.network.ApiClient
+import space.nbtca.app.core.network.NbtcaHttp
 import space.nbtca.app.ui.navigation.MainScreen
 import space.nbtca.app.ui.theme.NbtcaTheme
 
@@ -25,7 +31,15 @@ class MainActivity : ComponentActivity() {
 
         val appSettings = AppSettings.getInstance(this)
         val authManager = AuthManager.getInstance(this)
-        val apiClient = ApiClient(appSettings, authManager)
+        val http = NbtcaHttp.client(this)
+        val cache = DiskCache(this)
+        val coverStore = CoverStore(this)
+        val apiClient = ApiClient(
+            authManager = authManager,
+            newsRepository = NewsRepository(http, cache, coverStore),
+            calendarRepository = CalendarRepository(http, cache),
+            statusRepository = StatusRepository(http, cache)
+        )
 
         setContent {
             // 启动即恢复缓存会话：token 临期会静默刷新，避免每次打开都要重新登录。

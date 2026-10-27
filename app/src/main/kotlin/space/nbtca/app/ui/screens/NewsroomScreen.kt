@@ -136,7 +136,7 @@ fun NewsroomScreen(apiClient: ApiClient) {
             if (feed.isOffline) {
                 item {
                     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        OfflineBanner("当前显示离线缓存内容。启动 Go BFF 或检查网络后下拉刷新。")
+                        OfflineBanner("当前显示离线缓存内容。检查网络后下拉刷新。")
                     }
                 }
             }

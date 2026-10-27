@@ -112,8 +112,13 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
+    // HTML → Markdown for article bodies (was server-side in the old BFF)
+    implementation("org.jsoup:jsoup:1.18.1")
+
     // Preferences / DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    testImplementation("junit:junit:4.13.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

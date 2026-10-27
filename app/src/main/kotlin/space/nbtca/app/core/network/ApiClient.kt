@@ -9,7 +9,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -17,58 +16,44 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import space.nbtca.app.core.auth.AuthManager
-import space.nbtca.app.core.config.AppSettings
+import space.nbtca.app.core.data.CalendarRepository
+import space.nbtca.app.core.data.NewsRepository
+import space.nbtca.app.core.data.StatusRepository
 import space.nbtca.app.core.model.AssociationCalendar
-import space.nbtca.app.core.model.AssociationEvent
-import space.nbtca.app.core.model.DiagnosisResponse
 import space.nbtca.app.core.model.NewsArticle
-import space.nbtca.app.core.model.NewsFeedResponse
 import space.nbtca.app.core.model.NewsFeedResult
 import space.nbtca.app.core.model.RepairTicket
-import space.nbtca.app.core.model.ServiceComponent
-import space.nbtca.app.core.model.ServiceGroup
-import space.nbtca.app.core.model.ServiceIncident
 import space.nbtca.app.core.model.ServiceStatus
 import space.nbtca.app.core.model.TicketTimeline
 import space.nbtca.app.core.util.epochMillis
-import java.io.File
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 /**
- * 与 Flutter ApiClient 对齐的双通道客户端：
- * · BFF 通道（资讯 / 协会日历 / 服务状态 / 排障预检）
- * · Saturday 通道（维修工单全生命周期）
+ * 维修工单客户端（Saturday 直连）。
+ * 资讯 / 校历 / 协会日历 / 服务状态已改为各自 Repository 直连上游，不再经过 BFF。
  */
 class ApiClient(
-    private val appSettings: AppSettings,
-    private val authManager: AuthManager
+    private val authManager: AuthManager,
+    private val newsRepository: NewsRepository,
+    private val calendarRepository: CalendarRepository,
+    private val statusRepository: StatusRepository
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
-    private val formMedia = "application/x-www-form-urlencoded".toMediaType()
 
     private val http: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(12, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    val baseUrl: String get() = appSettings.apiBaseUrl
-
-    fun updateBaseUrl(url: String) {
-        appSettings.apiBaseUrl = url
-    }
-
     // ==========================================================
     // 基础请求
     // ==========================================================
 
     private suspend fun tokenOrNull(): String? = authManager.getValidAccessToken()
-
-    private fun bffUrl(path: String): String = baseUrl.trimEnd('/') + path
 
     private fun saturdayUrl(path: String): String = AuthManager.SATURDAY_ENDPOINT + path
 
@@ -113,140 +98,21 @@ class ApiClient(
         }
     }
 
-    /** BFF 统一响应体 {code, message, data}。 */
-    private fun unwrapBff(raw: String): JsonElement {
-        val root = json.parseToJsonElement(raw)
-        if (root is JsonObject && root["code"] is JsonPrimitive) {
-            val code = root["code"]!!.jsonPrimitive.contentOrNull?.toIntOrNull() ?: 0
-            if (code != 0) {
-                val msg = root["message"]?.jsonPrimitive?.contentOrNull ?: "服务返回错误"
-                throw ApiException(msg, null)
-            }
-            return root["data"] ?: JsonObject(emptyMap())
-        }
-        return root
-    }
-
     // ==========================================================
-    // 资讯（BFF）
+    // 资讯 / 工具：全部直连上游 Repository
     // ==========================================================
 
-    suspend fun getNewsFeed(): NewsFeedResult = withContext(Dispatchers.IO) {
-        try {
-            val res = execute(bffUrl(ApiEndpoints.NEWS_FEED), token = tokenOrNull())
-            val raw = res.getOrThrow()
-            val data = unwrapBff(raw) as? JsonObject ?: throw ApiException("资讯接口返回了无效数据", null)
-            val feed = json.decodeFromJsonElement(NewsFeedResponse.serializer(), data)
-            if (feed.featured.isEmpty() && feed.recent.isEmpty()) offlineNewsFeed() else NewsFeedResult(
-                featured = feed.featured,
-                recent = feed.recent,
-                categories = feed.categories,
-                isOffline = false
-            )
-        } catch (_: Exception) {
-            offlineNewsFeed()
-        }
-    }
+    suspend fun getNewsFeed(): NewsFeedResult = newsRepository.getFeed()
 
-    suspend fun getArticle(id: String): Result<NewsArticle> = withContext(Dispatchers.IO) {
-        try {
-            val encoded = URLEncoder.encode(id, "UTF-8")
-            val res = execute(bffUrl(ApiEndpoints.articleDetail(encoded)), token = tokenOrNull())
-            val data = unwrapBff(res.getOrThrow()) as? JsonObject
-                ?: return@withContext Result.failure(ApiException("文章接口返回了无效数据", null))
-            Result.success(json.decodeFromJsonElement(NewsArticle.serializer(), data))
-        } catch (e: Exception) {
-            Result.failure(if (e is ApiException) e else ApiException("文章加载失败，请检查网络后重试", null))
-        }
-    }
+    suspend fun getArticle(id: String): Result<NewsArticle> = newsRepository.getArticle(id)
 
-    // ==========================================================
-    // 工具（BFF）
-    // ==========================================================
-
-    suspend fun getAssociationCalendar(): Result<AssociationCalendar> = withContext(Dispatchers.IO) {
-        try {
-            val res = execute(bffUrl(ApiEndpoints.ASSOCIATION_CALENDAR), token = tokenOrNull())
-            val data = unwrapBff(res.getOrThrow()) as? JsonObject
-                ?: return@withContext Result.failure(ApiException("协会日历接口返回了无效数据", null))
-            val parsed = json.decodeFromJsonElement(AssociationCalendar.serializer(), data)
-            Result.success(parsed)
-        } catch (e: Exception) {
-            Result.failure(if (e is ApiException) e else ApiException("获取协会公共日历失败", null))
-        }
-    }
+    suspend fun getAssociationCalendar(): Result<AssociationCalendar> =
+        calendarRepository.getAssociationCalendar()
 
     /** 校历：当前教学周与总周数（用于课表按周翻页）。 */
-    suspend fun getSchoolWeek(): Pair<Int, Int>? = withContext(Dispatchers.IO) {
-        try {
-            val res = execute(bffUrl(ApiEndpoints.SCHOOL_CALENDAR), token = tokenOrNull())
-            val data = unwrapBff(res.getOrThrow()) as? JsonObject ?: return@withContext null
-            val current = data["current_week"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-            val total = data["total_weeks"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-            if (current != null && total != null && current > 0 && total > 0) current to total else null
-        } catch (_: Exception) {
-            null
-        }
-    }
+    suspend fun getSchoolWeek(): Pair<Int, Int>? = calendarRepository.getSchoolWeek()
 
-    suspend fun getServiceStatus(): ServiceStatus = withContext(Dispatchers.IO) {
-        try {
-            val res = execute(bffUrl(ApiEndpoints.INFRASTRUCTURE), token = tokenOrNull())
-            val data = unwrapBff(res.getOrThrow())
-            when (data) {
-                is JsonObject -> json.decodeFromJsonElement(ServiceStatus.serializer(), data)
-                is JsonArray -> legacyStatus(data)
-                else -> ServiceStatus.offline("服务状态接口返回了无效数据")
-            }
-        } catch (e: Exception) {
-            ServiceStatus.offline((e as? ApiException)?.message ?: "服务状态加载失败，请检查网络后重试")
-        }
-    }
-
-    private fun legacyStatus(nodes: JsonArray): ServiceStatus {
-        val components = nodes.mapNotNull { el ->
-            val obj = el as? JsonObject ?: return@mapNotNull null
-            ServiceComponent(
-                id = obj["endpoint"]?.jsonPrimitive?.contentOrNull ?: "",
-                name = obj["name"]?.jsonPrimitive?.contentOrNull ?: "",
-                state = obj["status"]?.jsonPrimitive?.contentOrNull ?: "unknown",
-                error = obj["note"]?.jsonPrimitive?.contentOrNull
-            )
-        }
-        val state = if (components.all { it.state == "operational" }) "operational" else "degraded"
-        return ServiceStatus(
-            state = state,
-            groups = listOf(ServiceGroup(name = "服务节点", infra = false, components = components))
-        )
-    }
-
-    suspend fun diagnoseIssue(deviceType: String, description: String): DiagnosisResponse = withContext(Dispatchers.IO) {
-        try {
-            val payload = buildJsonObject {
-                put("device_type", deviceType)
-                put("description", description)
-            }.toString()
-            val res = execute(bffUrl(ApiEndpoints.REPAIR_DIAGNOSE), "POST", tokenOrNull(), payload)
-            val data = unwrapBff(res.getOrThrow()) as? JsonObject
-                ?: return@withContext offlineDiagnosis()
-            json.decodeFromJsonElement(DiagnosisResponse.serializer(), data)
-        } catch (_: Exception) {
-            offlineDiagnosis()
-        }
-    }
-
-    private fun offlineDiagnosis(): DiagnosisResponse = DiagnosisResponse(
-        deviceType = "",
-        possibleCauses = listOf("硬件积灰散热不良或硅脂干涸", "驱动组件冲突或硬盘坏道", "系统引导与配置异常"),
-        selfHelpSteps = listOf(
-            "长按开机键 30 秒释放主板静电后重新通电",
-            "使用 Dism++ 清理系统冗余与启动项"
-        ),
-        recommendedTools = listOf("Dism++", "MemTest64"),
-        suggestRepair = true,
-        summary = "根据故障描述，建议携带设备参加本周六计算机协会义诊，由现场技术员进行深入检修测试。",
-        source = "offline"
-    )
+    suspend fun getServiceStatus(): ServiceStatus = statusRepository.get()
 
     // ==========================================================
     // 维修工单（Saturday 直连）
@@ -565,40 +431,6 @@ class ApiClient(
         else -> status
     }
 
-    // ==========================================================
-    // 离线兜底（与 Flutter _offlineNewsFeed 完全一致）
-    // ==========================================================
-
-    private fun offlineNewsFeed(): NewsFeedResult = NewsFeedResult(
-        isOffline = true,
-        categories = listOf("技术", "活动"),
-        featured = listOf(
-            NewsArticle(
-                id = "PhoNBT2024",
-                title = "影留宁理 - 2024年度摄影展与毕业季活动回顾",
-                category = "活动",
-                published = "2024 年 6 月 18 日",
-                author = "NBTCA 媒体部",
-                summary = "光影定格青春，计算机协会联合摄影爱好者呈现宁理校园夏日记忆纪实。",
-                coverUrl = "https://oss.nbtca.space/blog/clas/YQL05614-5xNq3t-mid-ulLkGV.jpeg",
-                articleUrl = "https://nbtca.space/posts/PhoNBT2024",
-                tags = listOf("摄影展", "毕业季", "校园生活")
-            )
-        ),
-        recent = listOf(
-            NewsArticle(
-                id = "go-struct-craft-1",
-                title = "Go 结构体精要 1：空结构体设计",
-                category = "技术",
-                published = "2026 年 3 月 18 日",
-                author = "Dev Team",
-                summary = "深入解析 struct{} 的零内存开销特性在信号通道、集合 Set 以及锁字段中的实战用法。",
-                coverUrl = "https://oss.nbtca.space/blog/clas/image-20220419101405456-wHMqwe.jpeg",
-                articleUrl = "https://nbtca.space/posts/blogs/Tech/GO/go-struct-craft-1-empty-struct",
-                tags = listOf("Golang", "性能优化")
-            )
-        )
-    )
 }
 
 /** 一张待上传的现场照片（已读入内存，避免缓存文件重名/被回收）。 */
