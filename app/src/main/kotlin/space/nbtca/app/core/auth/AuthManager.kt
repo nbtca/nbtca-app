@@ -249,6 +249,7 @@ class AuthManager private constructor(context: Context) {
 
     /** 手动退出：清除本机保存的账号信息、令牌与头像缓存。 */
     fun logout() {
+        space.nbtca.app.core.card.CardImages.clear()
         clearLocal()
         _state.value = AuthState()
         runCatching {

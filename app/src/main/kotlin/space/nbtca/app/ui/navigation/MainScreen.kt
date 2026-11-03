@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BuildCircle
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material3.Icon
@@ -30,6 +31,7 @@ import space.nbtca.app.core.network.ApiClient
 import space.nbtca.app.ui.screens.NewsroomScreen
 import space.nbtca.app.ui.screens.ProfileScreen
 import space.nbtca.app.ui.screens.RepairScreen
+import space.nbtca.app.ui.screens.CardScreen
 import space.nbtca.app.ui.screens.ToolsScreen
 import space.nbtca.app.ui.theme.AppColors
 import space.nbtca.app.ui.theme.AppThemeColors
@@ -49,6 +51,7 @@ fun MainScreen(
         NavItem("拔电关机", Icons.Default.Newspaper),
         NavItem("维修", Icons.Default.BuildCircle),
         NavItem("工具", Icons.Default.CloudDone),
+        NavItem("Card", Icons.Default.CreditCard),
         NavItem("个人中心", Icons.Default.AccountCircle)
     )
 
@@ -87,6 +90,7 @@ fun MainScreen(
                         androidx.compose.ui.platform.LocalContext.current
                     )
                 )
+                3 -> CardScreen()
                 else -> ProfileScreen(
                     appSettings = appSettings,
                     authManager = authManager,

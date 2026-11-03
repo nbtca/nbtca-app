@@ -20,9 +20,9 @@ android {
         applicationId = "space.nbtca.app"
         minSdk = 26
         targetSdk = 35
-        // CI 按 tag 传入版本号（如 -PversionName=1.0.1-beta.1）；本地默认 1.0.0
-        versionCode = (findProperty("versionCode") as String?)?.toIntOrNull() ?: 2
-        versionName = (findProperty("versionName") as String?) ?: "1.0.0"
+        // CI 按 tag 传入版本号（如 -PversionName=1.0.1-beta.1）；本地默认与当前 Beta 发布一致
+        versionCode = (findProperty("versionCode") as String?)?.toIntOrNull() ?: 1000103
+        versionName = (findProperty("versionName") as String?) ?: "1.0.1-beta.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
