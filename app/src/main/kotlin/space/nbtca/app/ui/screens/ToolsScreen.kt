@@ -55,7 +55,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-import space.nbtca.app.core.model.AssociationCalendar
 import space.nbtca.app.core.model.ServiceComponent
 import space.nbtca.app.core.model.ServiceIncident
 import space.nbtca.app.core.model.ServiceStatus
@@ -72,18 +71,20 @@ fun ToolsScreen(apiClient: ApiClient, academicStore: space.nbtca.app.core.academ
     val scope = rememberCoroutineScope()
 
     var status by remember { mutableStateOf<ServiceStatus?>(null) }
-    var calendar by remember { mutableStateOf<AssociationCalendar?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+    var isLoading by remember { mutableStateOf(false) }
     var showCalendar by remember { mutableStateOf(false) }
     var monitorExpanded by remember { mutableStateOf(false) }
     var academicPage by remember { mutableStateOf<String?>(null) }
 
     fun load() {
+        if (isLoading) return
         isLoading = true
         scope.launch {
-            status = apiClient.getServiceStatus()
-            calendar = apiClient.getAssociationCalendar().getOrNull()
-            isLoading = false
+            try {
+                status = apiClient.getServiceStatus()
+            } finally {
+                isLoading = false
+            }
         }
     }
 
@@ -91,7 +92,7 @@ fun ToolsScreen(apiClient: ApiClient, academicStore: space.nbtca.app.core.academ
 
     if (showCalendar) {
         AssociationCalendarScreen(
-            calendar = calendar,
+            calendar = null,
             apiClient = apiClient,
             onBack = { showCalendar = false }
         )
@@ -119,7 +120,7 @@ fun ToolsScreen(apiClient: ApiClient, academicStore: space.nbtca.app.core.academ
             TopAppBar(
                 title = { Text("工具箱", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(onClick = { load() }) {
+                    IconButton(onClick = { load() }, enabled = !isLoading) {
                         Icon(Icons.Default.Refresh, contentDescription = "刷新服务状态")
                     }
                 },
@@ -127,13 +128,6 @@ fun ToolsScreen(apiClient: ApiClient, academicStore: space.nbtca.app.core.academ
             )
         }
     ) { padding ->
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = AppColors.Primary)
-            }
-            return@Scaffold
-        }
-
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(top = 12.dp, bottom = 36.dp)
@@ -230,6 +224,7 @@ fun ToolsScreen(apiClient: ApiClient, academicStore: space.nbtca.app.core.academ
             item {
                 MonitorCard(
                     status = status,
+                    isLoading = isLoading,
                     expanded = monitorExpanded,
                     onToggle = { monitorExpanded = !monitorExpanded }
                 )
@@ -242,6 +237,7 @@ fun ToolsScreen(apiClient: ApiClient, academicStore: space.nbtca.app.core.academ
 @Composable
 private fun MonitorCard(
     status: ServiceStatus?,
+    isLoading: Boolean,
     expanded: Boolean,
     onToggle: () -> Unit
 ) {
@@ -279,11 +275,18 @@ private fun MonitorCard(
                             if (isNotEmpty()) append(" · ")
                             append("更新于 $updated")
                         }
-                        if (isEmpty()) append(status?.message ?: "暂无服务状态数据")
+                        if (isEmpty()) append(if (isLoading) "正在读取服务状态…" else status?.message ?: "暂无服务状态数据")
                     },
                     modifier = Modifier.padding(top = 2.dp),
                     fontSize = 11.sp,
                     color = AppThemeColors.textSecondary
+                )
+            }
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.padding(end = 8.dp).size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = AppColors.Primary
                 )
             }
             Icon(

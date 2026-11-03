@@ -131,7 +131,7 @@ fun ProfileScreen(
                 ) {
                     val profile = auth.profile
                     if (auth.isLoggedIn && profile != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.Top) {
                             Box(
                                 modifier = Modifier
                                     .size(68.dp)
@@ -152,24 +152,14 @@ fun ProfileScreen(
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = profile.name,
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = AppThemeColors.textPrimary
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .background(Color(0xFF34C759).copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text("Logto 已授权", color = Color(0xFF34C759), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
                                 Text(
-                                    text = "账号: ${profile.email}",
+                                    text = profile.name,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AppThemeColors.textPrimary
+                                )
+                                Text(
+                                    text = profile.email,
                                     modifier = Modifier.padding(top = 4.dp),
                                     fontSize = 13.sp,
                                     color = AppThemeColors.textSecondary

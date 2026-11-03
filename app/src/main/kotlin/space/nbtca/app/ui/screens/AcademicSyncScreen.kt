@@ -2,6 +2,7 @@ package space.nbtca.app.ui.screens
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -115,15 +116,22 @@ fun AcademicSyncScreen(
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 loading = false
                                 val current = url.orEmpty()
-                                android.util.Log.d("AcademicSync", "page[$stage]: $current")
+                                android.util.Log.i("AcademicSync", "page[$stage]: ${android.net.Uri.parse(current).host}${android.net.Uri.parse(current).path}")
                                 if (current.contains("authserver")) {
-                                    if (stage == Stage.LOGIN) {
-                                        status = "请在此登录（含验证码），登录后会自动继续"
-                                    }
+                                    // SSO 也可能要求再次登录，撤掉遮罩以便交互验证。
+                                    stage = Stage.LOGIN
+                                    error = null
+                                    status = "请在此登录（含验证码），登录后会自动继续"
                                     return
                                 }
                                 when (stage) {
                                     Stage.LOGIN -> {
+                                        if (android.net.Uri.parse(current).host == "jwxt-443.webvpn.nbt.edu.cn") {
+                                            stage = Stage.TERMS
+                                            status = "正在读取学期列表…"
+                                            view?.evaluateJavascript(AcademicWebSync.TERMS_SCRIPT, null)
+                                            return
+                                        }
                                         if (!current.contains("webvpn.nbt.edu.cn")) return
                                         // 用页面内容判断是否真的登录成功：门户有「常用站点」，
                                         // 且不再有登录表单。只看 URL 会被 webvpn 的 302 骗到。
@@ -154,6 +162,14 @@ fun AcademicSyncScreen(
                                         view?.evaluateJavascript(AcademicWebSync.TERMS_SCRIPT, null)
                                     }
                                     else -> Unit
+                                }
+                            }
+
+                            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, failure: WebResourceError?) {
+                                if (request?.isForMainFrame == true) {
+                                    loading = false
+                                    error = "连接教务系统失败，请检查网络后重试（${failure?.errorCode}）"
+                                    status = error.orEmpty()
                                 }
                             }
 
@@ -189,6 +205,11 @@ fun AcademicSyncScreen(
     LaunchedEffect(stage) {
         val view = webView
         when (stage) {
+            Stage.SSO -> {
+                delay(30000)
+                loading = false
+                error = "进入教务系统超时，请关闭后重试"
+            }
             Stage.TERMS -> {
                 if (view == null) return@LaunchedEffect
                 repeat(40) { attempt ->

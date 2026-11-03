@@ -32,6 +32,7 @@ object AcademicWebSync {
         (function () {
           const KEY = 'nbt_terms';
           window.__nbtTerms = null;
+          try { localStorage.removeItem(KEY); } catch (e) {}
           const emit = (v) => { window.__nbtTerms = v; try { localStorage.setItem(KEY, v); } catch (e) {} };
           const pickIn = (doc) => {
             if (!doc) return null;
@@ -86,7 +87,12 @@ object AcademicWebSync {
           try { localStorage.removeItem(KEY); } catch (e) {}
           const emit = (v) => { window.__nbtSync = v; try { localStorage.setItem(KEY, v); } catch (e) {} };
           const enc = (o) => Object.keys(o).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(o[k])).join('&');
-          const H = (u, o) => fetch(u, Object.assign({ credentials: 'include' }, o || {}));
+          const H = async (u, o) => {
+            const res = await fetch(u, Object.assign({ credentials: 'include', cache: 'no-store' }, o || {}));
+            if (!res.ok) throw new Error('教务请求失败（HTTP ' + res.status + '）');
+            if (res.url.indexOf('authserver') >= 0) throw new Error('登录状态已失效，请重新登录');
+            return res;
+          };
           const XNM = '$xnm', XQM = '$xqm';
           (async () => {
             const ttRes = await H('/jwglxt/kbcx/xskbcx_cxXsgrkb.html', {
@@ -106,8 +112,8 @@ object AcademicWebSync {
                 });
                 const text = await res.text();
                 let data = null;
-                try { data = JSON.parse(text); } catch (e) { break; }
-                if (!data || !data.items) break;
+                try { data = JSON.parse(text); } catch (e) { throw new Error('教务返回了非 JSON 响应，请重新登录后重试'); }
+                if (!data || !Array.isArray(data.items)) throw new Error('教务返回的数据格式异常，请重试');
                 out = out.concat(data.items);
                 total = data.totalPage || 1;
                 page += 1;
@@ -132,14 +138,14 @@ object AcademicWebSync {
     fun parseTerms(rawResult: String): TermCatalog {
         val root = unwrap(rawResult)
         (root["error"] as? JsonPrimitive)?.contentOrNull?.let { code ->
-            android.util.Log.e("AcademicSync", "terms failed: $rawResult")
+            android.util.Log.e("AcademicSync", "terms failed: $code")
             val debug = root["debug"]?.jsonPrimitive?.contentOrNull ?: ""
             throw AcademicException("未取到学期列表（$code）${if (debug.isBlank()) "" else "：$debug"}")
         }
         val years = parseOptions(root["yHtml"]?.jsonPrimitive?.contentOrNull.orEmpty())
         val semesters = parseOptions(root["sHtml"]?.jsonPrimitive?.contentOrNull.orEmpty())
         if (years.isEmpty() || semesters.isEmpty()) {
-            android.util.Log.e("AcademicSync", "terms empty: $rawResult")
+            android.util.Log.e("AcademicSync", "terms empty")
             throw AcademicException("未取到可选学期，请重试")
         }
         // 学年按标签升序展示；默认选中当前学年（8 月之后算新学年）
@@ -181,12 +187,20 @@ object AcademicWebSync {
         (root["error"] as? JsonPrimitive)?.contentOrNull?.let {
             throw AcademicException("教务网页请求失败：$it")
         }
-        val exams = (root["exams"] as? JsonArray ?: JsonArray(emptyList()))
-        val grades = (root["grades"] as? JsonArray ?: JsonArray(emptyList()))
+        // 接口全部校验成功后才覆盖本地快照，避免把登录页保存为空课表。
+        val timetableRaw = root["tt"]?.jsonPrimitive?.contentOrNull
+            ?: throw AcademicException("教务未返回课表数据")
+        val timetableJson = runCatching { json.parseToJsonElement(timetableRaw) }.getOrNull()
+        if (timetableJson !is JsonArray &&
+            (timetableJson !is JsonObject || timetableJson["kbList"] !is JsonArray)) {
+            throw AcademicException("课表响应异常或登录已失效，请重新登录后重试")
+        }
+        val exams = root["exams"] as? JsonArray ?: throw AcademicException("教务未返回考试数据")
+        val grades = root["grades"] as? JsonArray ?: throw AcademicException("教务未返回成绩数据")
         val snapshot = AcademicSnapshot(
             studentId = store.studentId,
             termLabel = termLabel,
-            timetable = AcademicClient.parseTimetableRaw(root["tt"]?.jsonPrimitive?.contentOrNull.orEmpty()),
+            timetable = AcademicClient.parseTimetableRaw(timetableRaw),
             exams = AcademicClient.parseExamRows(exams),
             grades = AcademicClient.parseGradeRows(grades),
             updatedAt = System.currentTimeMillis()
