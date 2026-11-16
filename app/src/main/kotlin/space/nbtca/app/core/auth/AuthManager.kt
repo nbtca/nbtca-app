@@ -45,37 +45,6 @@ class AuthManager private constructor(context: Context) {
     private var idToken: String? = null
     private var expiresAt: Long = 0L
     private var viewRole: String? = null
-    private var cardToken: String? = null
-    private var cardExpiresAt = 0L
-
-    data class CardCredentials(val accessToken: String, val identityToken: String, val subject: String)
-
-    suspend fun getCardCredentials(): CardCredentials {
-        val identity = getValidAccessToken() ?: throw IllegalStateException("请先登录 NBTCA 账号")
-        return refreshMutex.withLock {
-            val subject = state.value.profile?.sub?.takeIf { it.isNotBlank() }
-                ?: throw IllegalStateException("请先登录 NBTCA 账号")
-            if (cardToken == null || System.currentTimeMillis() >= cardExpiresAt - 60000) {
-                val rt = refreshToken ?: throw IllegalStateException("请重新登录 NBTCA 账号")
-                val result = LogtoAuth.refreshToken(http, rt, LogtoAuth.CARD_RESOURCE)
-                val tokens = result.getOrElse { failure ->
-                    if (failure is LogtoHttpError && failure.code in listOf(400,401)) {
-                        throw IllegalStateException("当前登录需要更新，请重新登录 NBTCA 账号一次")
-                    }
-                    throw IllegalStateException("暂时无法验证 Card 身份，请稍后重试")
-                }
-                if (refreshToken != rt || state.value.profile?.sub != subject) throw IllegalStateException("账号已切换，请重试")
-                // All refresh-token rotations share the same mutex; never replace the UserInfo token with a resource JWT.
-                refreshToken = tokens.refresh_token ?: rt
-                prefs.edit().putString(KEY_REFRESH, TokenCipher.encrypt(refreshToken)).apply()
-                android.util.Log.i("CardIdentity", "resource token obtained; refresh rotated=${tokens.refresh_token != null}")
-                cardToken = tokens.access_token
-                cardExpiresAt = System.currentTimeMillis() + tokens.expires_in * 1000L
-            }
-            CardCredentials(requireNotNull(cardToken), accessToken ?: identity, subject)
-        }
-    }
-
 
     init {
         restore()
@@ -170,12 +139,9 @@ class AuthManager private constructor(context: Context) {
 
     /** PKCE 换取 token 后建立登录态，并拉取 Logto + Saturday 身份。 */
     suspend fun loginWithTokens(tokens: LogtoTokenSet): Result<UserProfile> = withContext(Dispatchers.IO) {
-        cardToken = null
-        cardExpiresAt = 0L
         _state.value = _state.value.copy(isAuthenticating = true)
         try {
             applyTokens(tokens)
-            android.util.Log.i("CardIdentity", "NBTCA login completed; refresh available=${tokens.refresh_token != null}")
             val profile = fetchProfile(tokens.access_token, tokens.id_token)
             viewRole = null
             prefs.edit()
@@ -295,8 +261,6 @@ class AuthManager private constructor(context: Context) {
     }
 
     private fun clearLocal() {
-        cardToken = null
-        cardExpiresAt = 0L
         accessToken = null
         refreshToken = null
         idToken = null

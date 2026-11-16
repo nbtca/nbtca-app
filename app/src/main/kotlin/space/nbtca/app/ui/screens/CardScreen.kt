@@ -1,6 +1,6 @@
 package space.nbtca.app.ui.screens
 
-import space.nbtca.app.core.auth.AuthManager
+import android.webkit.CookieManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -28,15 +28,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import space.nbtca.app.core.card.CardClient
+import space.nbtca.app.core.card.CardRepository
 import space.nbtca.app.ui.components.FrostedCard
 import space.nbtca.app.ui.theme.AppThemeColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CardScreen() {
-    val authManager = AuthManager.getInstance(LocalContext.current)
-    val auth by authManager.state.collectAsState()
     var path by remember { mutableStateOf("/me") }
     var doc by remember { mutableStateOf<Document?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -53,12 +51,12 @@ fun CardScreen() {
     val scope = rememberCoroutineScope()
     fun navigate(next: String) { path = next; doc = null; error = null; notice = null }
     if (login) {
-        LoginScreen(authManager = authManager, onClose = { login = false; refresh++ })
+        CardLoginScreen(onClose = { login = false }, onLoggedIn = { login = false; refresh++ })
         return
     }
-    LaunchedEffect(path, refresh, auth.profile?.sub, auth.isLoggedIn) {
+    LaunchedEffect(path, refresh) {
         loading = true; error = null; doc = null
-        try { doc = CardClient.page(authManager, path) }
+        try { doc = CardRepository.load(path) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { error = failure.message }
         finally { loading = false }
@@ -77,7 +75,7 @@ fun CardScreen() {
         submitting = true
         scope.launch {
             try {
-                doc = CardClient.page(authManager, path, fields)
+                doc = CardRepository.claim(path, fields)
                 notice = if (path == "/me") "已保存" else "已更新活动券状态"
                 error = null
             } catch (cancelled: CancellationException) { throw cancelled }
@@ -99,7 +97,7 @@ fun CardScreen() {
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Card 菜单") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("重新登录 NBTCA") }, onClick = { menu = false; login = true })
+                    DropdownMenuItem(text = { Text("重新授权") }, onClick = { menu = false; login = true })
                 }
             }
         },
@@ -116,7 +114,7 @@ fun CardScreen() {
             if (loading) item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) }
             error?.let { message -> item { FrostedCard { Text(message); Row {
                 TextButton(onClick = { refresh++ }) { Text("重试") }
-                TextButton(onClick = { login = true }) { Text("登录 NBTCA") }
+                TextButton(onClick = { login = true }) { Text("登录 Card") }
             } } } }
             notice?.let { item { Text(it, Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.primary) } }
             val current = doc
@@ -174,9 +172,16 @@ fun CardScreen() {
                         Text(current.selectFirst(".who .name")?.text().orEmpty())
                         Text(current.selectFirst(".act .notice")?.text().orEmpty(), modifier = Modifier.padding(vertical = 8.dp))
                         if (current.selectFirst("form.claim") != null) {
-                            var holder by remember(current) { mutableStateOf(current.selectFirst("form.claim input[name=name]")?.`val`().orEmpty()) }
-                            if (current.selectFirst("form.claim input[name=name]") != null) OutlinedTextField(holder, { holder = it.take(20) }, label = { Text("持券人姓名") })
-                            Button(onClick = { post(mapOf("name" to holder)) }, enabled = !submitting) { Text(if (submitting) "正在领取…" else "领取活动券") }
+                            val parsed = remember(current) { runCatching { CardRepository.claimFields(current) } }
+                            val claimFields = parsed.getOrNull().orEmpty()
+                            val values = remember(current) { mutableStateMapOf<String,String>().apply { claimFields.forEach { put(it.name,it.value) } } }
+                            parsed.exceptionOrNull()?.message?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+                            claimFields.filterNot { it.hidden }.forEach { field ->
+                                OutlinedTextField(values[field.name].orEmpty(), { values[field.name]=it.take(field.maxLength) },
+                                    label={Text(field.label + if(field.required) " *" else "")},singleLine=true,
+                                    modifier=Modifier.fillMaxWidth().padding(top=8.dp),enabled=!submitting)
+                            }
+                            Button(onClick = { post(values.toMap()) }, enabled = !submitting && parsed.isSuccess && claimFields.all { !it.required || !values[it.name].isNullOrBlank() }) { Text(if (submitting) "正在领取…" else "领取活动券") }
                         } else if (current.selectFirst(".act a[href^=/login]") != null) {
                             Button(onClick = { login = true }) { Text("登录后领取") }
                         }
