@@ -4,7 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import space.nbtca.app.core.auth.AuthManager
+import android.webkit.CookieManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
 object CardMediaUpload {
     suspend fun upload(context: Context, kind: String, uri: Uri) {
         require(kind in listOf("portrait", "background"))
-        val credentials = AuthManager.getInstance(context).getCardCredentials()
+        val cookie = withContext(Dispatchers.Main) { CookieManager.getInstance().getCookie(CardClient.ORIGIN).orEmpty() }
         withContext(Dispatchers.IO) {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it, null, bounds) }
@@ -43,7 +43,7 @@ object CardMediaUpload {
                 .addFormDataPart("full","full.png",full.toRequestBody("image/png".toMediaType()))
                 .addFormDataPart("thumb","thumb.png",thumb.toRequestBody("image/png".toMediaType())).build()
             val client=OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).callTimeout(45,TimeUnit.SECONDS).build()
-            val request=Request.Builder().url(CardClient.ORIGIN+"/native/api/me/media?kind="+kind).header("Authorization","Bearer ${credentials.accessToken}").header("X-Logto-Userinfo",credentials.identityToken)
+            val request=Request.Builder().url(CardClient.ORIGIN+"/api/me/media?kind="+kind).header("Cookie",cookie)
                 .header("Origin",CardClient.ORIGIN).header("Referer",CardClient.ORIGIN+"/me").put(body).build()
             client.newCall(request).execute().use { response ->
                 if(response.code in 300..399 || response.code==401) throw CardLoginRequired()

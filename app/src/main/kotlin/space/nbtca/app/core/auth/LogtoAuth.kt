@@ -31,7 +31,6 @@ object LogtoAuth {
     const val ENDPOINT = "https://auth.app.nbtca.space"
     const val APP_ID = "a3tt7oyxeounfiqqugiah"
     const val REDIRECT_URI = "https://nbtca.space/callback"
-    const val CARD_RESOURCE = "https://card.nbtca.space/native"
     const val SCOPE = "openid profile email offline_access roles custom_data"
 
     private val secureRandom = SecureRandom()
@@ -66,7 +65,6 @@ object LogtoAuth {
             .appendQueryParameter("response_type", "code")
             .appendQueryParameter("scope", SCOPE)
             .appendQueryParameter("prompt", "consent")
-            .appendQueryParameter("resource", CARD_RESOURCE)
             .appendQueryParameter("code_challenge", codeChallenge)
             .appendQueryParameter("code_challenge_method", "S256")
             .appendQueryParameter("state", state)

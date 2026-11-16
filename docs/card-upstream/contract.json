@@ -1,0 +1,25 @@
+{
+  "repository": "nbtca/card",
+  "baselineCommit": "8a752f9299bb53bc17024334c19176087e36f9c9",
+  "auth": "Cloudflare Access via Logto; CF_Authorization cookie",
+  "files": {
+    "src/cards/MemberCard.astro": "a3480bb3b2689de7d01979b69e9341fd95e0fc81",
+    "src/cards/pass.ts": "6b3dfed2fcbe9ea2729dd357f56cd9aea9a8d410",
+    "src/cards/passes/default.astro": "d32deb9497fa1bfc194a886f7f9c3333f6d0b541",
+    "src/components/EventList.astro": "badb151009d67c47c5c189e1a41ab68dae77aa3b",
+    "src/layouts/Base.astro": "2f2ae635600a2d9c22593fab859557540fcb1d99",
+    "src/lib/access.ts": "d9e43e790e8d82e51de1e0393e420446cb6088ff",
+    "src/lib/attendee.ts": "d886c71e10725dd62629e6e6a4cca7cb2da443c6",
+    "src/middleware.ts": "27c0b674b5a0b97668f9c8592aaa1c730d005a0e",
+    "src/pages/api/me/media.ts": "97250da3f8d82e6968fd6b79d26ef1e985995811",
+    "src/pages/api/pass.ts": "fd29fa02dff7e1da9370ebb6c149c763429202d7",
+    "src/pages/api/redeem.ts": "5d81d585d018adcd698cd03b267dee7aab7c2131",
+    "src/pages/e/[slug]/index.astro": "e43520852eea7883142b59a055d2278a0e215301",
+    "src/pages/e/index.astro": "2571a98d4f9c6c2209c6e8d1f920d7b94240fa0e",
+    "src/pages/login.ts": "1ce917308625d250a1237f580c0a2233505e0850",
+    "src/pages/me.astro": "93c4ab63975bafc95768f47a8be2e47a275d4cfc",
+    "src/pages/media/[...key].ts": "971ea034582d5bdc3755d56c0650eb1dc97655b6",
+    "src/pages/members/[id].astro": "1fd35a7dd361c760d52d497bf212bfc41e7ddd46",
+    "src/pages/members/index.astro": "21a0d515b9fec91f62c2d2107bae8ef1a20ce8af"
+  }
+}

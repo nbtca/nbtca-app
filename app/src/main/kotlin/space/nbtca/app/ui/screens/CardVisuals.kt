@@ -1,5 +1,6 @@
 package space.nbtca.app.ui.screens
 
+import android.webkit.CookieManager
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
@@ -47,11 +48,11 @@ internal fun rememberCardImageLoader(): ImageLoader {
 internal fun CardImage(model: Any?, loader: ImageLoader, modifier: Modifier, scale: ContentScale = ContentScale.Crop, description: String? = null) {
     if (model == null) return
     val context = LocalContext.current
-    val subject = space.nbtca.app.core.auth.AuthManager.getInstance(context).state.value.profile?.sub.orEmpty()
-    val request = remember(model,subject) { space.nbtca.app.core.card.CardImages.request(context,model,subject) }
+    val cookie = CookieManager.getInstance().getCookie(CardClient.ORIGIN).orEmpty()
+    val request = remember(model,cookie) { space.nbtca.app.core.card.CardImages.request(context,model,cookie) }
     Box(modifier) {
         if(model is String && model.startsWith("/media/members/") && !model.contains(".thumb.")) {
-            val thumb = remember(model,subject) { space.nbtca.app.core.card.CardImages.request(context,space.nbtca.app.core.card.CardImages.thumbnail(model),subject) }
+            val thumb = remember(model,cookie) { space.nbtca.app.core.card.CardImages.request(context,space.nbtca.app.core.card.CardImages.thumbnail(model),cookie) }
             AsyncImage(model=thumb,imageLoader=loader,contentDescription=null,contentScale=scale,modifier=Modifier.matchParentSize())
         }
         AsyncImage(model = request, imageLoader = loader, contentDescription = description, contentScale = scale, modifier = Modifier.matchParentSize())

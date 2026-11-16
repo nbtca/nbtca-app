@@ -1,0 +1,32 @@
+name: Card upstream compatibility
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * *'
+  pull_request:
+    paths:
+      - 'app/src/main/kotlin/space/nbtca/app/core/card/**'
+      - 'app/src/main/kotlin/space/nbtca/app/ui/screens/Card*.kt'
+      - 'docs/card-upstream/**'
+      - 'scripts/check-card-upstream.mjs'
+      - '.github/workflows/card-upstream.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/card-upstream/**'
+      - 'scripts/check-card-upstream.mjs'
+      - '.github/workflows/card-upstream.yml'
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/check-card-upstream.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
