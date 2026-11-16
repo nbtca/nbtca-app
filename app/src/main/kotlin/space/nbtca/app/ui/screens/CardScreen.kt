@@ -1,6 +1,6 @@
 package space.nbtca.app.ui.screens
 
-import android.webkit.CookieManager
+import space.nbtca.app.core.auth.AuthManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -35,6 +35,8 @@ import space.nbtca.app.ui.theme.AppThemeColors
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CardScreen() {
+    val authManager = AuthManager.getInstance(LocalContext.current)
+    val auth by authManager.state.collectAsState()
     var path by remember { mutableStateOf("/me") }
     var doc by remember { mutableStateOf<Document?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -51,12 +53,12 @@ fun CardScreen() {
     val scope = rememberCoroutineScope()
     fun navigate(next: String) { path = next; doc = null; error = null; notice = null }
     if (login) {
-        CardLoginScreen(onClose = { login = false }, onLoggedIn = { login = false; refresh++ })
+        LoginScreen(authManager = authManager, onClose = { login = false; refresh++ })
         return
     }
-    LaunchedEffect(path, refresh) {
+    LaunchedEffect(path, refresh, auth.profile?.sub, auth.isLoggedIn) {
         loading = true; error = null; doc = null
-        try { doc = CardClient.page(path) }
+        try { doc = CardClient.page(authManager, path) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { error = failure.message }
         finally { loading = false }
@@ -75,7 +77,7 @@ fun CardScreen() {
         submitting = true
         scope.launch {
             try {
-                doc = CardClient.page(path, fields)
+                doc = CardClient.page(authManager, path, fields)
                 notice = if (path == "/me") "已保存" else "已更新活动券状态"
                 error = null
             } catch (cancelled: CancellationException) { throw cancelled }
@@ -97,7 +99,7 @@ fun CardScreen() {
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Card 菜单") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("重新授权") }, onClick = { menu = false; login = true })
+                    DropdownMenuItem(text = { Text("重新登录 NBTCA") }, onClick = { menu = false; login = true })
                 }
             }
         },
@@ -114,7 +116,7 @@ fun CardScreen() {
             if (loading) item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) }
             error?.let { message -> item { FrostedCard { Text(message); Row {
                 TextButton(onClick = { refresh++ }) { Text("重试") }
-                TextButton(onClick = { login = true }) { Text("登录 Card") }
+                TextButton(onClick = { login = true }) { Text("登录 NBTCA") }
             } } } }
             notice?.let { item { Text(it, Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.primary) } }
             val current = doc

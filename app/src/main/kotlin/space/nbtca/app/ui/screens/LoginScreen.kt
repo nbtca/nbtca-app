@@ -47,7 +47,7 @@ import java.util.concurrent.TimeUnit
  * 视口高度兜底脚本：仅当 100vh 解析为 0（WebView 缺陷）时才注入固定像素高度，
  * 正常环境探测到 vh > 0 会直接返回，不做任何修改。
  */
-private const val VIEWPORT_HEIGHT_FALLBACK = """
+internal const val VIEWPORT_HEIGHT_FALLBACK = """
 (function () {
   try {
     var probe = document.createElement('div');
@@ -187,7 +187,12 @@ fun LoginScreen(
                             ): Boolean {
                                 val target = request?.url?.toString() ?: return false
                                 if (LogtoAuth.isRedirect(target)) {
-                                    val code = android.net.Uri.parse(target).getQueryParameter("code")
+                                    val callback = android.net.Uri.parse(target)
+                                    if (callback.getQueryParameter("state") != state) {
+                                        error = "登录校验失败，请关闭后重试"
+                                        return true
+                                    }
+                                    val code = callback.getQueryParameter("code")
                                     if (!code.isNullOrEmpty()) {
                                         handleCode(code)
                                     } else {

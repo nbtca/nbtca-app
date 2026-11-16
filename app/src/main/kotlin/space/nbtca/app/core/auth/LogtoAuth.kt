@@ -31,6 +31,7 @@ object LogtoAuth {
     const val ENDPOINT = "https://auth.app.nbtca.space"
     const val APP_ID = "a3tt7oyxeounfiqqugiah"
     const val REDIRECT_URI = "https://nbtca.space/callback"
+    const val CARD_RESOURCE = "https://card.nbtca.space/native"
     const val SCOPE = "openid profile email offline_access roles custom_data"
 
     private val secureRandom = SecureRandom()
@@ -64,6 +65,8 @@ object LogtoAuth {
             .appendQueryParameter("redirect_uri", REDIRECT_URI)
             .appendQueryParameter("response_type", "code")
             .appendQueryParameter("scope", SCOPE)
+            .appendQueryParameter("prompt", "consent")
+            .appendQueryParameter("resource", CARD_RESOURCE)
             .appendQueryParameter("code_challenge", codeChallenge)
             .appendQueryParameter("code_challenge_method", "S256")
             .appendQueryParameter("state", state)
@@ -114,13 +117,15 @@ object LogtoAuth {
 
     suspend fun refreshToken(
         client: OkHttpClient,
-        refreshToken: String
+        refreshToken: String,
+        resource: String? = null
     ): Result<LogtoTokenSet> = withContext(Dispatchers.IO) {
         try {
             val body = FormBody.Builder()
                 .add("grant_type", "refresh_token")
                 .add("client_id", APP_ID)
                 .add("refresh_token", refreshToken)
+                .apply { resource?.let { add("resource", it) } }
                 .build()
 
             val request = Request.Builder()

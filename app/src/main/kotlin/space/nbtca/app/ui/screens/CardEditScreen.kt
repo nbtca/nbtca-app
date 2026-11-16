@@ -70,10 +70,10 @@ internal fun CardEditScreen(doc: Document, loader: coil.ImageLoader, onBack: () 
             busy=true; error=null
             scope.launch {
                 try {
-                    CardClient.page("/me",fields.toMap())
+                    CardClient.page(space.nbtca.app.core.auth.AuthManager.getInstance(context), "/me",fields.toMap())
                     background?.let { CardMediaUpload.upload(context,"background",it) }
                     portrait?.let { CardMediaUpload.upload(context,"portrait",it) }
-                    onSaved(CardClient.page("/me"))
+                    onSaved(CardClient.page(space.nbtca.app.core.auth.AuthManager.getInstance(context), "/me"))
                 } catch(cancelled:CancellationException) {throw cancelled}
                 catch(failure:Exception) {error="保存未完成：${failure.message}。已成功提交的部分会保留，可重试。"}
                 finally {busy=false}

@@ -42,6 +42,11 @@ fun CardLoginScreen(onClose: () -> Unit, onLoggedIn: () -> Unit) {
                     override fun onPageFinished(v: WebView?, url: String?) {
                         loading = false
                         val uri = Uri.parse(url.orEmpty())
+                        if (uri.scheme == "https" && uri.host == "auth.app.nbtca.space") {
+                            v?.evaluateJavascript(VIEWPORT_HEIGHT_FALLBACK) { result ->
+                                android.util.Log.i("CardAuth", "viewport=$result")
+                            }
+                        }
                         if (uri.scheme == "https" && uri.host == "card.nbtca.space" && uri.path == "/e") {
                             v?.evaluateJavascript("!!document.querySelector('nav a.me:not(.signin)')") { result ->
                                 if (result == "true" && !completed) {
