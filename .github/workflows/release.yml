@@ -65,6 +65,14 @@ jobs:
             PRE="${BASH_REMATCH[2]}"
           fi
           VERSION_CODE=$(( MAJOR * 1000000 + MINOR * 10000 + PATCH * 100 + PRE ))
+          # A rebuilt release may keep its public version while increasing Android's upgrade code.
+          if [ -f release.properties ]; then
+            CONFIG_VERSION=$(sed -n 's/^versionName=//p' release.properties | tr -d '\r')
+            CONFIG_CODE=$(sed -n 's/^versionCode=//p' release.properties | tr -d '\r')
+            [ "$CONFIG_VERSION" = "$VERSION" ] || { echo "release.properties 与 tag 不匹配"; exit 1; }
+            [[ "$CONFIG_CODE" =~ ^[0-9]+$ ]] || { echo "无效的 versionCode"; exit 1; }
+            VERSION_CODE="$CONFIG_CODE"
+          fi
           echo "打包版本：$VERSION（versionCode=$VERSION_CODE）"
           ./gradlew assembleRelease -PversionName="$VERSION" -PversionCode="$VERSION_CODE" --stacktrace
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"

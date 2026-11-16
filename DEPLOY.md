@@ -32,6 +32,8 @@
 | `ANDROID_KEY_ALIAS` | key alias，默认 `nbtca` |
 | `ANDROID_KEY_PASSWORD` | key 密码 |
 
+发布前更新根目录 `release.properties` 中的 versionName 与递增的 versionCode，versionName 必须与 tag 去掉 v 前缀后一致。同名版本重打也必须递增 versionCode。
+
 打 tag 发布（GitHub Actions 会构建签名 APK 并创建 Release）：
 
 ```bash
