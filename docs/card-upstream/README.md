@@ -20,3 +20,5 @@ contract.json 固定已审阅的源码 commit/blob 哈希。Card upstream compat
 同步顺序：审阅上游差异 → 更新适配和固定样例测试 → 实机检查 → 更新基线。检查通过仅代表源码没有漂移，不等于所有业务已实测。不要只更新哈希消除失败。
 
 维护者在 [nbtca-app#3](https://github.com/nbtca/nbtca-app/issues/3) 明确要求网页登录和 CF_Authorization Cookie；生产 main 不再提供 /native。此约定是当前适配依据。
+
+上游 fe9e06b 的兼容性审阅：票券二维码的透明度和模糊样式限定在票根内，资料页配色按钮的渐变延伸到边框。两处均只修改 CSS，Android 使用的 HTML 结构、表单字段和 HTTP 接口保持兼容。
