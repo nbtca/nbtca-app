@@ -28,6 +28,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import space.nbtca.app.core.card.CardEventPage
 import space.nbtca.app.core.card.CardHome
 import space.nbtca.app.core.card.CardRepository
 import space.nbtca.app.ui.components.FrostedCard
@@ -90,6 +91,7 @@ fun CardScreen() {
         }
     }
     val home = remember(path, doc) { if (path == "/me") doc?.let { CardHome.parse(it) } else null }
+    val events = remember(path, doc) { if (path == "/e") doc?.let { CardEventPage.parse(it) } else null }
     if (editing && home is CardHome.Member) {
         CardEditScreen(doc!!, imageLoader, onBack = { editing = false }, onSaved = { doc = it; editing = false; notice = "卡片已保存" })
         return
@@ -127,23 +129,20 @@ fun CardScreen() {
             val current = doc
             if (current != null) {
                 if (path == "/e") {
-                    val entries = current.select(".caption")
-                    if (entries.isEmpty()) item {
+                    if (events?.upcoming.isNullOrEmpty()) item {
                         Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             TicketVisual(null, Modifier.width(cardWidth), preview = true)
                             Text("近期暂无活动", Modifier.padding(top = 20.dp), fontWeight = FontWeight.Bold)
                             Text("有新活动时，可在这里领取专属活动券", style = MaterialTheme.typography.bodySmall, color = AppThemeColors.textSecondary)
                         }
                     }
-                    items(entries) { entry ->
-                        val link = entry.selectFirst("a[href]")
-                        FrostedCard(onClick = { link?.attr("href")?.let(::navigate) }) {
-                            entry.parent()?.selectFirst(".pass-card")?.let { TicketVisual(it, Modifier.fillMaxWidth(), compact = true) }
-                            Text(entry.selectFirst(".chip")?.text().orEmpty(), color = MaterialTheme.colorScheme.primary)
-                            Text(entry.selectFirst("h3")?.text().orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 8.dp))
-                            Text(entry.selectFirst("p")?.wholeText().orEmpty(), color = AppThemeColors.textSecondary)
+                    cardEventRows(events?.upcoming.orEmpty(), ::navigate)
+                    events?.pastTitle?.let { title ->
+                        item {
+                            Text(title, Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
+                        cardEventRows(events.past, ::navigate)
                     }
                 } else if (path == "/members") {
                     val cards = current.select("a.card")

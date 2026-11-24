@@ -1,6 +1,7 @@
 package space.nbtca.app.core.card
 
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 
 data class CardClaimField(val name: String, val label: String, val value: String, val required: Boolean, val maxLength: Int, val hidden: Boolean)
 
@@ -21,12 +22,17 @@ object CardRepository {
             path == "/me" -> CardHome.parse(doc) != null
             path.startsWith("/members/") -> doc.selectFirst(".card.full") != null
             path == "/members" -> doc.selectFirst("main ul") != null
-            path == "/e" -> doc.selectFirst("main h1")?.text() == "活动"
+            path == "/e" -> CardEventPage.parse(doc) != null
             path.startsWith("/e/") -> doc.selectFirst(".info h1") != null && doc.selectFirst(".pass-card") != null
             else -> false
         }
         check(supported) { "Card 页面结构已变化，请更新 App 后重试" }
     }
+    fun checkInCode(card: Element): Element? {
+        if (!card.hasClass("full") || card.attr("data-state") != "valid") return null
+        return card.selectFirst(".ticket[data-ticket][data-check-in=open] > .under > svg.qr")
+    }
+
     fun claimFields(doc: Document): List<CardClaimField> = doc.select("form.claim input[name]").map { input ->
         val name=input.attr("name")
         val hidden=input.attr("type")=="hidden"

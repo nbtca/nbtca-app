@@ -11,8 +11,6 @@ internal sealed interface CardHome {
     }
 
     companion object {
-        private val eventPath = Regex("/e/[A-Za-z0-9_-]+")
-
         fun parse(doc: Document): CardHome? {
             doc.selectFirst(".card.full")?.let { return Member(it) }
             val header = doc.selectFirst("header.wrap.guest") ?: return null
@@ -33,7 +31,7 @@ internal sealed interface CardHome {
                         title = caption?.selectFirst("b")?.text().orEmpty(),
                         note = caption?.selectFirst("span")?.text().orEmpty(),
                         serial = caption?.selectFirst("small")?.text().orEmpty(),
-                        eventPath = preview.attr("href").takeIf(eventPath::matches)
+                        eventPath = cardEventPath(preview.attr("href"))
                     )
                 }
                 Guest.Shelf(heading, section.children().firstOrNull { it.tagName() == "p" && it.hasClass("muted") }?.text(), tickets)
