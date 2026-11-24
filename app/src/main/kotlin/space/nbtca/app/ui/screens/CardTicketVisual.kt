@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.jsoup.nodes.Element
+import space.nbtca.app.core.card.CardRepository
 
 @Composable
 private fun VideoWord(word: String, modifier: Modifier, animate: Boolean) {
@@ -51,7 +52,7 @@ private fun VideoWord(word: String, modifier: Modifier, animate: Boolean) {
 @Composable
 internal fun TicketVisual(element: Element?, modifier: Modifier=Modifier, preview: Boolean=false, compact: Boolean=false) {
     val state=element?.attr("data-state").orEmpty()
-    val code=element?.selectFirst("[data-ticket][data-check-in=open] svg.qr")
+    val code=element?.let(CardRepository::checkInCode)
     var reveal by remember(element) { mutableStateOf(false) }
     val shape=remember { GenericShape { size,_ ->
         val base=Path().apply {addRoundRect(RoundRect(Rect(Offset.Zero,size),CornerRadius(size.width*.055f)))}
@@ -99,6 +100,12 @@ internal fun TicketVisual(element: Element?, modifier: Modifier=Modifier, previe
                     preview || state=="preview" -> Column(horizontalAlignment=Alignment.CenterHorizontally) {Text("仅供预览 · 非入场凭证",fontSize=(w*.037f).sp,color=Color.Gray); Text("领取后生成专属活动券",fontSize=(w*.028f).sp,color=Color.Gray)}
                     state=="redeemed" -> Text("已入场",fontWeight=FontWeight.Bold,color=Color(0xFF368C74),fontSize=(w*.08f).sp)
                     state=="expired" -> Text("活动已结束",color=Color.Gray)
+                    state == "host" -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("主办券", fontWeight = FontWeight.Bold, color = Color(0xFF94630B))
+                        element?.selectFirst(".stub .serial small")?.text()?.takeIf { it.isNotBlank() }?.let {
+                            Text(it, fontSize = (w * .035f).sp, color = Color.Gray)
+                        }
+                    }
                     code!=null && reveal -> Row(verticalAlignment=Alignment.CenterVertically) {
                         val svg=code.clone().attr("xmlns","http://www.w3.org/2000/svg").attr("width","256").attr("height","256")
                         coil.compose.AsyncImage(svg.outerHtml().toByteArray(),"入场二维码",modifier=Modifier.size((w*.29f).dp).background(Color.White).padding(8.dp))

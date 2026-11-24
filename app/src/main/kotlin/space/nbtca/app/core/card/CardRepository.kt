@@ -1,6 +1,7 @@
 package space.nbtca.app.core.card
 
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 
 data class CardClaimField(val name: String, val label: String, val value: String, val required: Boolean, val maxLength: Int, val hidden: Boolean)
 
@@ -9,7 +10,7 @@ object CardRepository {
     private val labels = mapOf("name" to "姓名", "student_id" to "学号", "class_name" to "班级", "phone" to "手机号")
     suspend fun load(path: String): Document = CardClient.page(path).also { validatePage(path,it) }
     suspend fun saveProfile(fields: Map<String,String>): Document = CardClient.page("/me",fields).also {
-        validatePage("/me",it)
+        check(CardHome.parse(it) is CardHome.Member) { "只有社员卡可以编辑" }
         check(it.select(".notice").any { node -> node.text().contains("已保存") }) { "服务端未确认保存，请刷新查看" }
     }
     suspend fun claim(path: String, fields: Map<String,String>): Document = CardClient.page(path,fields).also {
@@ -18,14 +19,20 @@ object CardRepository {
     }
     fun validatePage(path: String, doc: Document) {
         val supported = when {
-            path == "/me" || path.startsWith("/members/") -> doc.selectFirst(".card.full") != null
+            path == "/me" -> CardHome.parse(doc) != null
+            path.startsWith("/members/") -> doc.selectFirst(".card.full") != null
             path == "/members" -> doc.selectFirst("main ul") != null
-            path == "/e" -> doc.selectFirst("main h1")?.text() == "活动"
+            path == "/e" -> CardEventPage.parse(doc) != null
             path.startsWith("/e/") -> doc.selectFirst(".info h1") != null && doc.selectFirst(".pass-card") != null
             else -> false
         }
         check(supported) { "Card 页面结构已变化，请更新 App 后重试" }
     }
+    fun checkInCode(card: Element): Element? {
+        if (!card.hasClass("full") || card.attr("data-state") != "valid") return null
+        return card.selectFirst(".ticket[data-ticket][data-check-in=open] > .under > svg.qr")
+    }
+
     fun claimFields(doc: Document): List<CardClaimField> = doc.select("form.claim input[name]").map { input ->
         val name=input.attr("name")
         val hidden=input.attr("type")=="hidden"

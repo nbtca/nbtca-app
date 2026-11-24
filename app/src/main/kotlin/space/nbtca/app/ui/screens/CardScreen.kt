@@ -28,6 +28,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import space.nbtca.app.core.card.CardEventPage
+import space.nbtca.app.core.card.CardHome
 import space.nbtca.app.core.card.CardRepository
 import space.nbtca.app.ui.components.FrostedCard
 import space.nbtca.app.ui.theme.AppThemeColors
@@ -36,6 +38,7 @@ import space.nbtca.app.ui.theme.AppThemeColors
 @Composable
 fun CardScreen() {
     var path by remember { mutableStateOf("/me") }
+    var eventBackPath by remember { mutableStateOf("/e") }
     var doc by remember { mutableStateOf<Document?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -49,7 +52,11 @@ fun CardScreen() {
     val config = LocalConfiguration.current
     val cardWidth = minOf(config.screenWidthDp - 64f, (config.screenHeightDp - 300f) / 1.4f).coerceAtLeast(180f).dp
     val scope = rememberCoroutineScope()
-    fun navigate(next: String) { path = next; doc = null; error = null; notice = null }
+    fun navigate(next: String) {
+        if (submitting) return
+        if (next.startsWith("/e/") && (path == "/me" || path == "/e")) eventBackPath = path
+        path = next; doc = null; error = null; notice = null
+    }
     if (login) {
         CardLoginScreen(onClose = { login = false }, onLoggedIn = { login = false; refresh++ })
         return
@@ -69,7 +76,7 @@ fun CardScreen() {
         }
     }
     val detail = path.startsWith("/e/") || path.startsWith("/members/")
-    BackHandler(detail) { navigate(if (path.startsWith("/members/")) "/members" else "/e") }
+    BackHandler(detail) { navigate(if (path.startsWith("/members/")) "/members" else eventBackPath) }
     fun post(fields: Map<String,String>) {
         if (submitting) return
         submitting = true
@@ -83,13 +90,15 @@ fun CardScreen() {
             finally { submitting = false }
         }
     }
-    if (editing && doc?.selectFirst(".card.full") != null) {
+    val home = remember(path, doc) { if (path == "/me") doc?.let { CardHome.parse(it) } else null }
+    val events = remember(path, doc) { if (path == "/e") doc?.let { CardEventPage.parse(it) } else null }
+    if (editing && home is CardHome.Member) {
         CardEditScreen(doc!!, imageLoader, onBack = { editing = false }, onSaved = { doc = it; editing = false; notice = "卡片已保存" })
         return
     }
     Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = {
         TopAppBar(title = { Text("Card", fontWeight = FontWeight.Bold) }, navigationIcon = {
-            if (detail) IconButton(onClick = { navigate(if (path.startsWith("/members/")) "/members" else "/e") }) {
+            if (detail) IconButton(onClick = { navigate(if (path.startsWith("/members/")) "/members" else eventBackPath) }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
             }
         }, actions = {
@@ -120,23 +129,20 @@ fun CardScreen() {
             val current = doc
             if (current != null) {
                 if (path == "/e") {
-                    val entries = current.select(".caption")
-                    if (entries.isEmpty()) item {
+                    if (events?.upcoming.isNullOrEmpty()) item {
                         Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             TicketVisual(null, Modifier.width(cardWidth), preview = true)
                             Text("近期暂无活动", Modifier.padding(top = 20.dp), fontWeight = FontWeight.Bold)
                             Text("有新活动时，可在这里领取专属活动券", style = MaterialTheme.typography.bodySmall, color = AppThemeColors.textSecondary)
                         }
                     }
-                    items(entries) { entry ->
-                        val link = entry.selectFirst("a[href]")
-                        FrostedCard(onClick = { link?.attr("href")?.let(::navigate) }) {
-                            entry.parent()?.selectFirst(".pass-card")?.let { TicketVisual(it, Modifier.fillMaxWidth(), compact = true) }
-                            Text(entry.selectFirst(".chip")?.text().orEmpty(), color = MaterialTheme.colorScheme.primary)
-                            Text(entry.selectFirst("h3")?.text().orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 8.dp))
-                            Text(entry.selectFirst("p")?.wholeText().orEmpty(), color = AppThemeColors.textSecondary)
+                    cardEventRows(events?.upcoming.orEmpty(), ::navigate)
+                    events?.pastTitle?.let { title ->
+                        item {
+                            Text(title, Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
+                        cardEventRows(events.past, ::navigate)
                     }
                 } else if (path == "/members") {
                     val cards = current.select("a.card")
@@ -148,6 +154,8 @@ fun CardScreen() {
                             if (row.size == 1) Spacer(Modifier.weight(1f))
                         }
                     }
+                } else if (path == "/me" && home is CardHome.Guest) {
+                    guestCardHome(home, ::navigate)
                 } else if (path == "/me" || path.startsWith("/members/")) {
                     current.selectFirst(".card.full")?.let { card -> item {
                         Column(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
